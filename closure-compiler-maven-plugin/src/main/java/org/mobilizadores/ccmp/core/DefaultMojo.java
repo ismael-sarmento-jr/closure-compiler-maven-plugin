@@ -1,8 +1,6 @@
 package org.mobilizadores.ccmp.core;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -26,7 +24,7 @@ import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import com.google.common.io.Files;
-import com.google.javascript.jscomp.JSModule;
+import com.google.javascript.jscomp.CompilationLevel;
 
 /**
  * @goal
@@ -46,6 +44,9 @@ public class DefaultMojo extends AbstractMojo {
   @Parameter(defaultValue = "/target/js/")
   String outputDirectory;
   
+  @Parameter(alias = "level", defaultValue = "SIMPLE_OPTIMIZATIONS", required = true)
+  CompilationLevel compilationLevel;
+  
   /**
    * If the outputFile is not specified, then the files are going to be minified seperately.
    */
@@ -60,14 +61,14 @@ public class DefaultMojo extends AbstractMojo {
       throw new MojoExecutionException("Either parameter 'includeFiles' or 'inputDirectory' must be specified");
     
     mergeIncludeFilesList();
-    CommandLineRunnerExposer clre = new CommandLineRunnerExposer();
-    clre.initializeAndExpose(this);
+    CommandLineRunnerExposer clre = 
+        (CommandLineRunnerExposer) new CommandLineRunnerExposer("com.google.javascript.jscomp.CommandLineRunner").initializeAndExpose();
     if(this.outputFile == null) {
       this.includeFiles.stream().forEach(file -> {
-        clre.run(file, Arrays.asList(new String[] {file}));
+        clre.run(file, Arrays.asList(new String[] {file}), this);
       });
     } else {
-      clre.run(this.outputFile, this.includeFiles);
+      clre.run(this.outputFile, this.includeFiles, this);
     }
   }
 
@@ -87,53 +88,7 @@ public class DefaultMojo extends AbstractMojo {
       throw new MojoExecutionException("No javascript files were found.");
   }
 
-  public static void main(String[] args) throws MojoExecutionException, IOException {
-    DefaultMojo defaultMojo = new DefaultMojo();
-    defaultMojo.failOnNoInputFilesFound = true;
-//    List<String> args2 = new ArrayList<>();
-    List<String> inputFiles = new ArrayList<>();
-    
-    File inDir = Files.createTempDir();
-    File outDir = Files.createTempDir();
 
-    File inputFile1 = new File(inDir, "input1.js");
-    String inputSource1 = "var x=1;\n";
-    Files.asCharSink(inputFile1, UTF_8).write(inputSource1);
-
-    File inputFile2 = new File(inDir, "input2.js");
-    String inputSource2 = "var y=2;\n";
-    Files.asCharSink(inputFile2, UTF_8).write(inputSource2);
-
-    File outputFile1 = new File(outDir, "a.js");
-    File outputFile2 = new File(outDir, "b.js");
-    File weakFile = new File(outDir, JSModule.WEAK_MODULE_NAME + ".js");
-
-//    args2.add(outDir.toString() + "/");
-    defaultMojo.outputDirectory = outDir.toString() + "/";
-//    args2.add("--js");
-//    args2.add(inputFile1.toString());
-    inputFiles.add(inputFile1.toString());
-//    args2.add("--js");
-//    args2.add(inputFile2.toString());
-    inputFiles.add(inputFile2.toString());
-    defaultMojo.includeFiles = inputFiles;
-
-    // CommandLineRunner runner =
-    // new CommandLineRunner(
-    // args2.toArray(new String[] {}), new PrintStream(outReader), new PrintStream(errReader));
-    //
-    // lastCompiler = runner.getCompiler();
-    try {
-      defaultMojo.execute();
-    } catch (Exception e) {
-      e.printStackTrace();
-      // assertWithMessage("Unexpected exception " + e).fail();
-    }
-
-    System.out.println(Files.asCharSource(outputFile1, UTF_8).read().equals(inputSource1));
-    System.out.println(Files.asCharSource(outputFile2, UTF_8).read().equals(inputSource2));
-    System.out.println(weakFile.exists());
-  }
 }
 
 
