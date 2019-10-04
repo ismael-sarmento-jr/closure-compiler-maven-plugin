@@ -5,6 +5,7 @@ import java.io.PrintStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
+import java.security.Permission;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -45,7 +46,7 @@ import com.google.javascript.jscomp.deps.ModuleLoader;
 /**
  * @goal
  */
-@Mojo(name = "compress", defaultPhase = LifecyclePhase.PROCESS_SOURCES)
+@Mojo(name = "compress", defaultPhase = LifecyclePhase.PROCESS_RESOURCES)
 public class DefaultMojo extends AbstractMojo {
 
   @Parameter(defaultValue = "true")
@@ -270,29 +271,105 @@ public class DefaultMojo extends AbstractMojo {
   @Parameter
   private boolean helpMarkdown = false;
 
-
+  
   public void execute() throws MojoExecutionException {
     if (this.inputDirectory == null && this.includeFiles == null)
       throw new MojoExecutionException(
           "Either parameter 'includeFiles' or 'inputDirectory' must be specified");
 
+    disableSystemExit();
     mergeIncludeFilesList();
     if (this.outputFile == null) {
       this.includeFiles.stream().forEach(file -> {
-        runCommand(getCommandLine(this.outputDirectory.getAbsolutePath() + "/" + file.getName(), file.getPath()));
+        try {
+          Thread ccThread = new Thread(new RunClosureCompiler(
+                getCommandLine(this.outputDirectory.getAbsolutePath() + "/" + file.getName(), file.getPath())
+              ));
+          ccThread.start();
+          ccThread.join();
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        } catch (SecurityException e) {}
+        finally {
+          enableSystemExit();
+        }
       });
     } else {
-      runCommand(getCommandLine(this.outputFile, this.includeFiles.toArray(new String[] {})));
+      try {
+        Thread ccThread = new Thread(new RunClosureCompiler(
+            getCommandLine(this.outputFile, this.includeFiles.toArray(new String[] {}))
+            ));
+        ccThread.start();
+        ccThread.join();
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+      } catch (SecurityException e) {}
+      finally {
+        enableSystemExit();
+      }
+    }
+  }
+  
+  class RunClosureCompiler implements Runnable {
+    
+    private String[] args;
+
+    public RunClosureCompiler(String[] args) {
+      super();
+      this.args = args;
+    }
+
+    @Override
+    public void run() {
+      try {
+        MethodUtils.invokeMethod(getCommandLineRunnerNewInstance(args), true, "run");
+      } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+        e.printStackTrace();
+      }
+    }
+    
+    public CommandLineRunner getCommandLineRunnerNewInstance(String[] args) {
+      CommandLineRunner clr = null;
+      try {
+        Constructor<CommandLineRunner> constructor = CommandLineRunner.class
+            .getDeclaredConstructor(String[].class, PrintStream.class, PrintStream.class);
+        constructor.setAccessible(true);
+        clr = constructor.newInstance(args, System.out, System.err);
+      } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
+          | InvocationTargetException | NoSuchMethodException | SecurityException e) {
+        e.printStackTrace();
+      }
+      return clr;
+    }
+ }
+
+  public class StopExitSecurityManager extends SecurityManager {
+    private SecurityManager _prevMgr = System.getSecurityManager();
+
+    public void checkPermission(Permission perm) {}
+
+    public void checkExit(int status) {
+      super.checkExit(status);
+      throw new SecurityException(); // This throws an exception if an exit is called.
+    }
+
+    public SecurityManager getPreviousMgr() {
+      return _prevMgr;
     }
   }
 
+  public void disableSystemExit() {
+    SecurityManager securityManager = new StopExitSecurityManager();
+    System.setSecurityManager(securityManager);
+  }
 
-  private void runCommand(String[] commandLine) {
-    try {
-      MethodUtils.invokeMethod(getCommandLineRunnerNewInstance(commandLine), true, "run");
-    } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
-      e.printStackTrace();
-    }
+  public void enableSystemExit() {
+    SecurityManager mgr = System.getSecurityManager();
+    if ((mgr != null) && (mgr instanceof StopExitSecurityManager)) {
+      StopExitSecurityManager smgr = (StopExitSecurityManager) mgr;
+      System.setSecurityManager(smgr.getPreviousMgr());
+    } else
+      System.setSecurityManager(null);
   }
 
   private String[] getCommandLine(String outputFile, String... inputFiles) {
@@ -357,18 +434,6 @@ public class DefaultMojo extends AbstractMojo {
       throw new MojoExecutionException("No javascript files were found.");
   }
 
-  public CommandLineRunner getCommandLineRunnerNewInstance(String[] args) {
-    CommandLineRunner clr = null;
-    try {
-      Constructor<CommandLineRunner> constructor = CommandLineRunner.class
-          .getDeclaredConstructor(String[].class, PrintStream.class, PrintStream.class);
-      constructor.setAccessible(true);
-      clr = constructor.newInstance(args, System.out, System.err);
-    } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
-        | InvocationTargetException | NoSuchMethodException | SecurityException e) {
-      e.printStackTrace();
-    }
-    return clr;
-  }
+
 }
 

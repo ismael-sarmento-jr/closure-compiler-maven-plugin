@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.mobilizadores</groupId>
   <artifactId>closure-compiler-maven-plugin</artifactId>
-  <version>0.0.1-SNAPSHOT</version>
+  <version>0.0.1</version>
   <packaging>maven-plugin</packaging>
   <name>closure-compiler-maven-plugin</name>
   <url>https://github.com/ismael-sarmento-jr/closure-compiler-maven-plugin</url>
@@ -58,6 +58,36 @@
   </dependencies>
 
   <build>
+  	<pluginManagement>
+	  <plugins>
+	    <plugin>
+	     <groupId>org.eclipse.m2e</groupId>
+	     <artifactId>lifecycle-mapping</artifactId>
+	     <version>1.0.0</version>
+	     <configuration>
+	       <lifecycleMappingMetadata>
+	         <pluginExecutions>
+	           <pluginExecution>
+	             <pluginExecutionFilter>
+	             	<groupId>${project.groupId}</groupId>
+			        <artifactId>${project.artifactId}</artifactId>
+	                <versionRange>[0.0.1,)</versionRange>
+	               <goals>
+	                 <goal>generate-sources</goal>
+	               </goals>
+	             </pluginExecutionFilter>
+	             <action>
+	               <execute>
+	                 <runOnIncremental>false</runOnIncremental>
+	               </execute >
+	             </action>
+	           </pluginExecution>
+	         </pluginExecutions>
+	       </lifecycleMappingMetadata>
+	     </configuration>
+	    </plugin>
+	  </plugins>
+	</pluginManagement>
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
