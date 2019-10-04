@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.ClassUtils;
 import org.apache.commons.lang3.reflect.MethodUtils;
 /*
@@ -46,11 +47,14 @@ import com.google.javascript.jscomp.deps.ModuleLoader;
 /**
  * @goal
  */
-@Mojo(name = "compress", defaultPhase = LifecyclePhase.PROCESS_RESOURCES)
+@Mojo(name = "compress", defaultPhase = LifecyclePhase.PREPARE_PACKAGE)
 public class DefaultMojo extends AbstractMojo {
 
   @Parameter(defaultValue = "true")
   Boolean failOnNoInputFilesFound;
+  
+  @Parameter
+  String suffix;
 
   @Parameter
   File inputDirectory;
@@ -58,8 +62,11 @@ public class DefaultMojo extends AbstractMojo {
   @Parameter(alias = "js")
   List<File> includeFiles;
 
-  @Parameter(defaultValue = "target/js/")
+  @Parameter(defaultValue = "target/${project.build.finalName}/WEB-INF/js")
   File outputDirectory;
+  
+  @Parameter(defaultValue = "${project.basedir}", readonly = true)
+  File baseDir;
 
   // @Parameter(alias = "level", defaultValue = "SIMPLE_OPTIMIZATIONS", required = true)
   // CompilationLevel compilationLevel;
@@ -68,7 +75,7 @@ public class DefaultMojo extends AbstractMojo {
    * If the outputFile is not specified, then the files are going to be minified seperately.
    */
   @Parameter(alias = "jsOutputFile")
-  String outputFile;
+  File outputFile;
 
   @Parameter
   Map<String, Object> args;
@@ -280,30 +287,44 @@ public class DefaultMojo extends AbstractMojo {
     disableSystemExit();
     mergeIncludeFilesList();
     if (this.outputFile == null) {
-      this.includeFiles.stream().forEach(file -> {
-        try {
-          Thread ccThread = new Thread(new RunClosureCompiler(
-                getCommandLine(this.outputDirectory.getAbsolutePath() + "/" + file.getName(), file.getPath())
-              ));
-          ccThread.start();
-          ccThread.join();
-        } catch (InterruptedException e) {
-          e.printStackTrace();
-        } catch (SecurityException e) {}
-        finally {
-          enableSystemExit();
-        }
-      });
+      try {
+        this.includeFiles.stream().forEach(file -> {
+          //TODO print information on file being processed
+            String fileExtension = Files.getFileExtension(file.getName());
+            String fileName = this.suffix != null ? file.getName().replace(fileExtension, this.suffix + "." + fileExtension) : file.getName();
+            Thread ccThread = new Thread(new RunClosureCompiler(
+                //TODO make compiler use relative path for module name
+                //FIXME include dependence modules
+                //FIXME fix name C:\Users\ismae\eclipse_workspaces\closure-compiler-maven-plugin\test-maven-plugin\target\test-maven-plugin-0.0.1-SNAPSHOT\WEB-INF\js\min/\src\main\webapp\WEB-INF\js\base-service.jsbase-service.js
+                  getCommandLine(this.outputDirectory.getAbsolutePath()
+                                + "/" //+ file.getPath().replace(this.baseDir.getPath(), "") 
+                                + fileName, 
+                        file.getPath())
+                ));
+            ccThread.start();
+            try {
+              ccThread.join();
+            } catch (InterruptedException e) {
+              e.printStackTrace();
+            }
+        });
+      } catch (SecurityException e) {}
+      finally {
+        enableSystemExit();
+      }
     } else {
       try {
         Thread ccThread = new Thread(new RunClosureCompiler(
-            getCommandLine(this.outputFile, this.includeFiles.toArray(new String[] {}))
-            ));
+            getCommandLine(this.outputFile.getPath(), this.includeFiles.stream().map(file -> {
+              return file.getPath();
+            }).collect(Collectors.toList()).toArray(new String[] {}))));
         ccThread.start();
         ccThread.join();
       } catch (InterruptedException e) {
         e.printStackTrace();
-      } catch (SecurityException e) {}
+      } catch (SecurityException e) {
+        System.out.println("OK");
+      }
       finally {
         enableSystemExit();
       }
@@ -350,7 +371,7 @@ public class DefaultMojo extends AbstractMojo {
 
     public void checkExit(int status) {
       super.checkExit(status);
-      throw new SecurityException(); // This throws an exception if an exit is called.
+      throw new SecurityException(); //FIXME verify alternative for this
     }
 
     public SecurityManager getPreviousMgr() {
