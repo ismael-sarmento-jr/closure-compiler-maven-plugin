@@ -1,41 +1,24 @@
 package org.mobilizadores.ccmp.core;
 
 import java.io.File;
-import java.io.PrintStream;
-import java.lang.reflect.Constructor;
+import java.io.IOException;
 import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.security.Permission;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ClassUtils;
-import org.apache.commons.lang3.reflect.MethodUtils;
-/*
- * Copyright 2001-2005 The Apache Software Foundation.
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
- */
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.kohsuke.args4j.Option;
-import com.google.common.io.Files;
-import com.google.javascript.jscomp.CommandLineRunner;
 import com.google.javascript.jscomp.CompilationLevel;
 import com.google.javascript.jscomp.CompilerOptions;
 import com.google.javascript.jscomp.CompilerOptions.IsolationMode;
@@ -49,6 +32,8 @@ import com.google.javascript.jscomp.deps.ModuleLoader;
  */
 @Mojo(name = "compress", defaultPhase = LifecyclePhase.PREPARE_PACKAGE)
 public class DefaultMojo extends AbstractMojo {
+  
+  Logger logger = Logger.getLogger(DefaultMojo.class.getName());
 
   @Parameter(defaultValue = "true")
   Boolean failOnNoInputFilesFound;
@@ -77,323 +62,66 @@ public class DefaultMojo extends AbstractMojo {
   @Parameter(alias = "jsOutputFile")
   File outputFile;
 
-  @Parameter
-  Map<String, Object> args;
+//  @Parameter
+//  Map<String, Object> args;
 
-  @Parameter
-  private Integer browserFeaturesetYear = 0;
-  @Parameter
-  private boolean displayHelp = false;
-  @Parameter
-  private boolean printTree = false;
-  @Parameter
-  private boolean printAst = false;
-  @Parameter
-  private boolean printPassGraph = false;
-  @Parameter
-  private boolean emitUseStrict = true;
-  @Parameter
-  private boolean strictModeInput = true;
-  @Parameter
-  private CompilerOptions.DevMode jscompDevMode = CompilerOptions.DevMode.OFF;
-  @Parameter
-  private String loggingLevel = Level.WARNING.getName();
-  @Parameter
-  private List<String> externs = new ArrayList<>();
-  @Parameter
-  private List<String> unusedJsZip = null;
-  @Parameter
-  private List<String> chunk = new ArrayList<>();
-  @Parameter
-  private String continueSavedCompilationFile = null;
-  @Parameter
-  private String saveAfterChecksFile = null;
-  @Parameter
-  private String variableMapOutputFile = "";
-  @Parameter
-  private boolean createNameMapFiles = false;
-  @Parameter
-  private boolean sourceMapIncludeSourcesContent = false;
-  @Parameter
-  private String propertyMapOutputFile = "";
-  @Parameter
-  private boolean thirdParty = false;
-  @Parameter
-  private int summaryDetailLevel = 1;
-  @Parameter
-  private IsolationMode isolationMode = IsolationMode.NONE;
-  @Parameter
-  private String outputWrapper = "";
-  @Parameter
-  private String outputWrapperFile = "";
-  @Parameter
-  private List<String> chunkWrapper = new ArrayList<>();
-  @Parameter
-  private String chunkOutputPathPrefix = "./";
-  @Parameter
-  private String createSourceMap = "";
-  @Parameter
-  private SourceMap.Format sourceMapFormat = SourceMap.Format.DEFAULT;
-  @Parameter
-  private List<String> sourceMapLocationMapping = new ArrayList<>();
-  @Parameter
-  private List<String> sourceMapInputs = new ArrayList<>();
-  @Parameter
-  private Boolean parseInlineSourceMaps = true;
-  @Parameter
-  private boolean applyInputSourceMaps = true;
-  @Parameter
-  private List<String> jscompError = new ArrayList<>();
-  @Parameter
-  private List<String> jscompWarning = new ArrayList<>();
-  @Parameter
-  private List<String> jscompOff = new ArrayList<>();
-  @Parameter
-  private List<String> define = new ArrayList<>();
-  @Parameter
-  private String charset = "";
-  @Parameter
-  private String compilationLevel = "SIMPLE";
-  @Parameter
-  private CompilationLevel compilationLevelParsed = null;
-  @Parameter
-  private int numParallelThreads = 1;
-  @Parameter
-  private boolean checksOnly = false;
-  @Parameter
-  private CompilerOptions.IncrementalCheckMode incrementalCheckMode =
-      CompilerOptions.IncrementalCheckMode.OFF;
-  @Parameter
-  private boolean continueAfterErrors = false;
-  @Parameter
-  private boolean useTypesForOptimization = true;
-  @Parameter
-  private boolean assumeFunctionWrapper = false;
-  @Parameter
-  private WarningLevel warningLevel = WarningLevel.DEFAULT;
-  @Parameter
-  private boolean debug = false;
-  @Parameter
-  private boolean generateExports = false;
-  @Parameter
-  private boolean exportLocalPropertyDefinitions = false;
-  // @Parameter
-  // private List<FormattingOption> formatting = new ArrayList<>();
-  @Parameter
-  private boolean processCommonJsModules = false;
-  @Parameter
-  private List<String> commonJsPathPrefix = new ArrayList<>();
-  @Parameter
-  private List<String> moduleRoot = new ArrayList<>();
-  @Parameter
-  @Deprecated
-  private String commonJsEntryModule;
-  @Parameter
-  @Deprecated
-  private boolean transformAmdModules = false;
-  @Parameter
-  private boolean processClosurePrimitives = true;
-  @Parameter
-  @Deprecated
-  private boolean manageClosureDependencies = false;
-  @Parameter
-  @Deprecated
-  private boolean onlyClosureDependencies = false;
-  @Parameter
-  @Deprecated
-  private List<String> closureEntryPoint = new ArrayList<>();
-  @Parameter
-  private boolean angularPass = false;
-  @Parameter
-  @Deprecated
-  private boolean polymerPass = false;
-  @Parameter
-  private Integer polymerVersion = null;
-  @Parameter
-  private String polymerExportPolicy = PolymerExportPolicy.LEGACY.name();
-  @Parameter
-  private boolean chromePass = false;
-  @Parameter
-  private boolean dartPass = false;
-  @Parameter
-  private String j2clPassMode = "AUTO";
-  @Parameter
-  private String outputManifest = "";
-  @Parameter
-  private String outputChunkDependencies = "";
-  @Parameter
-  private String languageIn = "STABLE";
-  @Parameter
-  private String languageOut = "STABLE";
-  @Parameter
-  private boolean version = false;
-  @Parameter
-  private String translationsFile = "";
-  @Parameter
-  private String translationsProject = null;
-  @Parameter
-  private List<String> flagFiles = new ArrayList<>();
-  @Parameter
-  private String warningsWhitelistFile = "";
-  @Parameter
-  private List<String> hideWarningsFor = new ArrayList<>();
-  @Parameter
-  private List<String> extraAnnotationName = new ArrayList<>();
-  @Parameter
-  private CompilerOptions.TracerMode tracerMode = CompilerOptions.TracerMode.OFF;
-  @Parameter
-  private String renamePrefix = null;
-  @Parameter
-  private String renamePrefixNamespace = null;
-  @Parameter
-  private List<String> conformanceConfigs = new ArrayList<>();
-  @Parameter
-  private CompilerOptions.Environment environment = CompilerOptions.Environment.BROWSER;
-  // @Parameter
-  // private CompilerOptions.JsonStreamMode jsonStreamMode = CompilerOptions.JsonStreamMode.NONE;
-  @Parameter
-  private boolean preserveTypeAnnotations = false;
-  @Parameter
-  private boolean injectLibraries = true;
-  @Parameter
-  private List<String> forceInjectLibraries = new ArrayList<>();
-  // @Parameter
-  // private DependencyModeFlag dependencyMode = null; // so we can tell whether it was explicitly
-  @Parameter
-  private List<String> entryPoint = new ArrayList<>();
-  @Parameter
-  private boolean rewritePolyfills = true;
-  @Parameter
-  private boolean printSourceAfterEachPass = false;
-  @Parameter
-  private ModuleLoader.ResolutionMode moduleResolutionMode = ModuleLoader.ResolutionMode.BROWSER;
-  @Parameter
-  private Map<String, String> browserResolverPrefixReplacements = new HashMap<>();
-  @Parameter
-  private String packageJsonEntryNames = null;
-  // @Parameter
-  // private ErrorFormatOption errorFormat = ErrorFormatOption.STANDARD;
-  @Parameter
-  private boolean renaming = true;
-  @Parameter
-  private boolean helpMarkdown = false;
-
+  FilesHandler filesHandler;
   
+  SecurityManager securityManager = new OwnSecurityManager();
+  
+  public DefaultMojo() {
+    super();
+    System.setSecurityManager(this.securityManager);
+    this.filesHandler = new FilesHandler(this.includeFiles, this.inputDirectory, this.failOnNoInputFilesFound);
+  }
+
   public void execute() throws MojoExecutionException {
     if (this.inputDirectory == null && this.includeFiles == null)
       throw new MojoExecutionException(
           "Either parameter 'includeFiles' or 'inputDirectory' must be specified");
-
-    disableSystemExit();
-    mergeIncludeFilesList();
+    this.filesHandler.mergeIncludeFilesList();
     if (this.outputFile == null) {
-      try {
         this.includeFiles.stream().forEach(file -> {
+          try {
           //TODO print information on file being processed
-            String fileExtension = Files.getFileExtension(file.getName());
-            String fileName = this.suffix != null ? file.getName().replace(fileExtension, this.suffix + "." + fileExtension) : file.getName();
-            Thread ccThread = new Thread(new RunClosureCompiler(
-                //TODO make compiler use relative path for module name
-                //FIXME include dependence modules
-                //FIXME fix name C:\Users\ismae\eclipse_workspaces\closure-compiler-maven-plugin\test-maven-plugin\target\test-maven-plugin-0.0.1-SNAPSHOT\WEB-INF\js\min/\src\main\webapp\WEB-INF\js\base-service.jsbase-service.js
-                  getCommandLine(this.outputDirectory.getAbsolutePath()
-                                + "/" //+ file.getPath().replace(this.baseDir.getPath(), "") 
-                                + fileName, 
-                        file.getPath())
-                ));
-            ccThread.start();
-            try {
+            Set<String> fileList = this.filesHandler.getFileWithDepsList(file);
+            //TODO use thread POOL 
+            if(fileList.size() > 0) {
+              Thread ccThread = new Thread(new RunClosureCompiler(
+                  getCommandLine(this.outputDirectory.getAbsolutePath() + "/" + this.filesHandler.getResultFileRelativePath(file, this.suffix), 
+                      fileList.toArray(new String[]{}))
+                  ));
+              //TODO make compiler use relative path for module name
+              //FIXME fix name C:\Users\ismae\eclipse_workspaces\closure-compiler-maven-plugin\test-maven-plugin\target\test-maven-plugin-0.0.1-SNAPSHOT\WEB-INF\js\min/\src\main\webapp\WEB-INF\js\base-service.jsbase-service.js
+              ccThread.start();
               ccThread.join();
-            } catch (InterruptedException e) {
-              e.printStackTrace();
             }
+          } catch (InterruptedException e) {
+            e.printStackTrace();
+          } catch (IOException e) {
+            e.printStackTrace();
+          }
         });
-      } catch (SecurityException e) {}
-      finally {
-        enableSystemExit();
-      }
     } else {
       try {
-        Thread ccThread = new Thread(new RunClosureCompiler(
-            getCommandLine(this.outputFile.getPath(), this.includeFiles.stream().map(file -> {
-              return file.getPath();
-            }).collect(Collectors.toList()).toArray(new String[] {}))));
-        ccThread.start();
-        ccThread.join();
+        String[] inputArray = this.includeFiles.stream().map(file -> {
+                                                return file.getPath();
+                                              }).collect(Collectors.toList()).toArray(new String[] {});
+        if(inputArray.length > 0) {
+          Thread ccThread = new Thread(new RunClosureCompiler(
+              getCommandLine(this.outputFile.getPath(), inputArray)));
+          ccThread.start();
+          ccThread.join();
+        }
       } catch (InterruptedException e) {
         e.printStackTrace();
       } catch (SecurityException e) {
         System.out.println("OK");
       }
-      finally {
-        enableSystemExit();
-      }
     }
   }
   
-  class RunClosureCompiler implements Runnable {
-    
-    private String[] args;
-
-    public RunClosureCompiler(String[] args) {
-      super();
-      this.args = args;
-    }
-
-    @Override
-    public void run() {
-      try {
-        MethodUtils.invokeMethod(getCommandLineRunnerNewInstance(args), true, "run");
-      } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
-        e.printStackTrace();
-      }
-    }
-    
-    public CommandLineRunner getCommandLineRunnerNewInstance(String[] args) {
-      CommandLineRunner clr = null;
-      try {
-        Constructor<CommandLineRunner> constructor = CommandLineRunner.class
-            .getDeclaredConstructor(String[].class, PrintStream.class, PrintStream.class);
-        constructor.setAccessible(true);
-        clr = constructor.newInstance(args, System.out, System.err);
-      } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
-          | InvocationTargetException | NoSuchMethodException | SecurityException e) {
-        e.printStackTrace();
-      }
-      return clr;
-    }
- }
-
-  public class StopExitSecurityManager extends SecurityManager {
-    private SecurityManager _prevMgr = System.getSecurityManager();
-
-    public void checkPermission(Permission perm) {}
-
-    public void checkExit(int status) {
-      super.checkExit(status);
-      throw new SecurityException(); //FIXME verify alternative for this
-    }
-
-    public SecurityManager getPreviousMgr() {
-      return _prevMgr;
-    }
-  }
-
-  public void disableSystemExit() {
-    SecurityManager securityManager = new StopExitSecurityManager();
-    System.setSecurityManager(securityManager);
-  }
-
-  public void enableSystemExit() {
-    SecurityManager mgr = System.getSecurityManager();
-    if ((mgr != null) && (mgr instanceof StopExitSecurityManager)) {
-      StopExitSecurityManager smgr = (StopExitSecurityManager) mgr;
-      System.setSecurityManager(smgr.getPreviousMgr());
-    } else
-      System.setSecurityManager(null);
-  }
-
-  private String[] getCommandLine(String outputFile, String... inputFiles) {
+  String[] getCommandLine(String outputFile, String... inputFiles) {
     List<String> commandList = new ArrayList<>();
     try {
       Class<?> flagsClass = Class.forName("com.google.javascript.jscomp.CommandLineRunner$Flags");
@@ -412,7 +140,7 @@ public class DefaultMojo extends AbstractMojo {
   }
 
 
-  private List<String>  getPrimitiveArgs(Class<?> flagsClass) {
+  List<String>  getPrimitiveArgs(Class<?> flagsClass) {
     List<String> commandList = new ArrayList<String>();
     Field[] parameters = DefaultMojo.class.getDeclaredFields();
     parameters[0].isAnnotationPresent(Parameter.class);
@@ -435,26 +163,208 @@ public class DefaultMojo extends AbstractMojo {
     return commandList;
   }
   
-  public static void main(String[] args) {
-    new DefaultMojo().getPrimitiveArgs(null);
-  }
-
-  /**
-   * Finds javascript files in the inputDirectory and adds them to the includeFiles list.
-   */
-  private void mergeIncludeFilesList() throws MojoExecutionException {
-    this.includeFiles = this.includeFiles == null ? new ArrayList<>() : this.includeFiles;
-    if (this.inputDirectory != null) {
-      Files.fileTraverser().breadthFirst(this.inputDirectory).forEach(file -> {
-        if (file.isFile() && "js".equals(Files.getFileExtension(file.getName()))) {
-          this.includeFiles.add(file);
-        }
-      });
-    }
-    if (this.failOnNoInputFilesFound && this.includeFiles.isEmpty())
-      throw new MojoExecutionException("No javascript files were found.");
-  }
-
-
+  
+  /*
+   * ***************************************
+   * PRIMITIVE AND WRAPPER PROPERTIES
+   * ***************************************/
+  
+  @Parameter
+  Integer browserFeaturesetYear = 0;
+  @Parameter
+  boolean displayHelp = false;
+  @Parameter
+  boolean printTree = false;
+  @Parameter
+  boolean printAst = false;
+  @Parameter
+  boolean printPassGraph = false;
+  @Parameter
+  boolean emitUseStrict = true;
+  @Parameter
+  boolean strictModeInput = true;
+  @Parameter
+  CompilerOptions.DevMode jscompDevMode = CompilerOptions.DevMode.OFF;
+  @Parameter
+  String loggingLevel = Level.WARNING.getName();
+  @Parameter
+  List<String> externs = new ArrayList<>();
+  @Parameter
+  List<String> unusedJsZip = null;
+  @Parameter
+  List<String> chunk = new ArrayList<>();
+  @Parameter
+  String continueSavedCompilationFile = null;
+  @Parameter
+  String saveAfterChecksFile = null;
+  @Parameter
+  String variableMapOutputFile = "";
+  @Parameter
+  boolean createNameMapFiles = false;
+  @Parameter
+  boolean sourceMapIncludeSourcesContent = false;
+  @Parameter
+  String propertyMapOutputFile = "";
+  @Parameter
+  boolean thirdParty = false;
+  @Parameter
+  int summaryDetailLevel = 1;
+  @Parameter
+  IsolationMode isolationMode = IsolationMode.NONE;
+  @Parameter
+  String outputWrapper = "";
+  @Parameter
+  String outputWrapperFile = "";
+  @Parameter
+  List<String> chunkWrapper = new ArrayList<>();
+  @Parameter
+  String chunkOutputPathPrefix = "./";
+  @Parameter
+  String createSourceMap = "";
+  @Parameter
+  SourceMap.Format sourceMapFormat = SourceMap.Format.DEFAULT;
+  @Parameter
+  List<String> sourceMapLocationMapping = new ArrayList<>();
+  @Parameter
+  List<String> sourceMapInputs = new ArrayList<>();
+  @Parameter
+  Boolean parseInlineSourceMaps = true;
+  @Parameter
+  boolean applyInputSourceMaps = true;
+  @Parameter
+  List<String> jscompError = new ArrayList<>();
+  @Parameter
+  List<String> jscompWarning = new ArrayList<>();
+  @Parameter
+  List<String> jscompOff = new ArrayList<>();
+  @Parameter
+  List<String> define = new ArrayList<>();
+  @Parameter
+  String charset = "";
+  @Parameter
+  String compilationLevel = "SIMPLE";
+  @Parameter
+  CompilationLevel compilationLevelParsed = null;
+  @Parameter
+  int numParallelThreads = 1;
+  @Parameter
+  boolean checksOnly = false;
+  @Parameter
+  CompilerOptions.IncrementalCheckMode incrementalCheckMode =
+      CompilerOptions.IncrementalCheckMode.OFF;
+  @Parameter
+  boolean continueAfterErrors = false;
+  @Parameter
+  boolean useTypesForOptimization = true;
+  @Parameter
+  boolean assumeFunctionWrapper = false;
+  @Parameter
+  WarningLevel warningLevel = WarningLevel.DEFAULT;
+  @Parameter
+  boolean debug = false;
+  @Parameter
+  boolean generateExports = false;
+  @Parameter
+  boolean exportLocalPropertyDefinitions = false;
+  // @Parameter
+  // List<FormattingOption> formatting = new ArrayList<>();
+  @Parameter
+  boolean processCommonJsModules = false;
+  @Parameter
+  List<String> commonJsPathPrefix = new ArrayList<>();
+  @Parameter
+  List<String> moduleRoot = new ArrayList<>();
+  @Parameter
+  @Deprecated
+  String commonJsEntryModule;
+  @Parameter
+  @Deprecated
+  boolean transformAmdModules = false;
+  @Parameter
+  boolean processClosurePrimitives = true;
+  @Parameter
+  @Deprecated
+  boolean manageClosureDependencies = false;
+  @Parameter
+  @Deprecated
+  boolean onlyClosureDependencies = false;
+  @Parameter
+  @Deprecated
+  List<String> closureEntryPoint = new ArrayList<>();
+  @Parameter
+  boolean angularPass = false;
+  @Parameter
+  @Deprecated
+  boolean polymerPass = false;
+  @Parameter
+  Integer polymerVersion = null;
+  @Parameter
+  String polymerExportPolicy = PolymerExportPolicy.LEGACY.name();
+  @Parameter
+  boolean chromePass = false;
+  @Parameter
+  boolean dartPass = false;
+  @Parameter
+  String j2clPassMode = "AUTO";
+  @Parameter
+  String outputManifest = "";
+  @Parameter
+  String outputChunkDependencies = "";
+  @Parameter
+  String languageIn = "STABLE";
+  @Parameter
+  String languageOut = "STABLE";
+  @Parameter
+  boolean version = false;
+  @Parameter
+  String translationsFile = "";
+  @Parameter
+  String translationsProject = null;
+  @Parameter
+  List<String> flagFiles = new ArrayList<>();
+  @Parameter
+  String warningsWhitelistFile = "";
+  @Parameter
+  List<String> hideWarningsFor = new ArrayList<>();
+  @Parameter
+  List<String> extraAnnotationName = new ArrayList<>();
+  @Parameter
+  CompilerOptions.TracerMode tracerMode = CompilerOptions.TracerMode.OFF;
+  @Parameter
+  String renamePrefix = null;
+  @Parameter
+  String renamePrefixNamespace = null;
+  @Parameter
+  List<String> conformanceConfigs = new ArrayList<>();
+  @Parameter
+  CompilerOptions.Environment environment = CompilerOptions.Environment.BROWSER;
+  // @Parameter
+  // CompilerOptions.JsonStreamMode jsonStreamMode = CompilerOptions.JsonStreamMode.NONE;
+  @Parameter
+  boolean preserveTypeAnnotations = false;
+  @Parameter
+  boolean injectLibraries = true;
+  @Parameter
+  List<String> forceInjectLibraries = new ArrayList<>();
+  // @Parameter
+  // DependencyModeFlag dependencyMode = null; // so we can tell whether it was explicitly
+  @Parameter
+  List<String> entryPoint = new ArrayList<>();
+  @Parameter
+  boolean rewritePolyfills = true;
+  @Parameter
+  boolean printSourceAfterEachPass = false;
+  @Parameter
+  ModuleLoader.ResolutionMode moduleResolutionMode = ModuleLoader.ResolutionMode.BROWSER;
+  @Parameter
+  Map<String, String> browserResolverPrefixReplacements = new HashMap<>();
+  @Parameter
+  String packageJsonEntryNames = null;
+  // @Parameter
+  // ErrorFormatOption errorFormat = ErrorFormatOption.STANDARD;
+  @Parameter
+  boolean renaming = true;
+  @Parameter
+  boolean helpMarkdown = false;
 }
 
