@@ -22,21 +22,8 @@ public class FilesHandler {
   Logger logger = Logger.getLogger(FileHandler.class.getName());
   
   JsFileRegexParser jsParser = new JsFileRegexParser(new LoggerErrorManager(this.logger));
-
-  private List<File> includeFiles;
-
-  private File inputDirectory;
-
-  private boolean failOnNoInputFilesFound;
   
-
-  public FilesHandler(List<File> includeFiles, File inputDirectory,
-      boolean failOnNoInputFilesFound) {
-    super();
-    this.includeFiles = includeFiles;
-    this.inputDirectory = inputDirectory;
-    this.failOnNoInputFilesFound = failOnNoInputFilesFound;
-  }
+  private List<File> effectiveInputFilesList;
 
   public String getAbsolutePath(String depRelPath, String moduleAbsPath) {
     String sysSeparator = File.separator;
@@ -86,17 +73,22 @@ public class FilesHandler {
   
   /**
    * Finds javascript files in the inputDirectory and adds them to the includeFiles list.
+   * @param inputDirectory 
+   * @param includeFiles 
+   * @param failOnNoInputFilesFound 
    */
-  void mergeIncludeFilesList() throws MojoExecutionException {
-    this.includeFiles = this.includeFiles == null ? new ArrayList<>() : this.includeFiles;
-    if (this.inputDirectory != null) {
-      Files.fileTraverser().breadthFirst(this.inputDirectory).forEach(file -> {
+  public List<File> getEffectiveInputFilesList(File inputDirectory, List<File> includeFiles, boolean failOnNoInputFilesFound) throws MojoExecutionException {
+    this.effectiveInputFilesList = includeFiles == null ? new ArrayList<>() : includeFiles;
+    if (inputDirectory != null) {
+      Files.fileTraverser().breadthFirst(inputDirectory).forEach(file -> {
         if (file.isFile() && "js".equals(Files.getFileExtension(file.getName()))) {
-          this.includeFiles.add(file);
+          this.effectiveInputFilesList.add(file);
         }
       });
     }
-    if (this.failOnNoInputFilesFound && this.includeFiles.isEmpty())
+    if (failOnNoInputFilesFound && this.effectiveInputFilesList.isEmpty())
       throw new MojoExecutionException("No javascript files were found.");
+    
+    return this.effectiveInputFilesList;
   }
 }

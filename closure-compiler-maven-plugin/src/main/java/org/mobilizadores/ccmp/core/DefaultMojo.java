@@ -5,13 +5,22 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Observable;
+import java.util.Observer;
 import java.util.Set;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.apache.commons.lang3.ClassUtils;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -31,12 +40,13 @@ import com.google.javascript.jscomp.deps.ModuleLoader;
  * @goal
  */
 @Mojo(name = "compress", defaultPhase = LifecyclePhase.PREPARE_PACKAGE)
-public class DefaultMojo extends AbstractMojo {
+public class DefaultMojo extends AbstractMojo implements Observer {
   
-  Logger logger = Logger.getLogger(DefaultMojo.class.getName());
-
   @Parameter(defaultValue = "true")
   Boolean failOnNoInputFilesFound;
+  
+  @Parameter(defaultValue = "10")
+  Integer maxNumberOfThreads;
   
   @Parameter
   String suffix;
@@ -65,59 +75,103 @@ public class DefaultMojo extends AbstractMojo {
 //  @Parameter
 //  Map<String, Object> args;
 
-  FilesHandler filesHandler;
-  
-  SecurityManager securityManager = new OwnSecurityManager();
+  FilesHandler filesHandler = new FilesHandler();
+  Object lock = new Object();
+  StealingSecurityManager securityManager = new StealingSecurityManager();
   
   public DefaultMojo() {
     super();
     System.setSecurityManager(this.securityManager);
-    this.filesHandler = new FilesHandler(this.includeFiles, this.inputDirectory, this.failOnNoInputFilesFound);
+  }
+  
+  public static void main(String[] args) throws InterruptedException {
+    //for (int i = 0; i < 10; i++) {
+      
+//      ThreadPoolExecutor threadPoolExecutor = new ThreadPoolExecutor(3, 3, 0, TimeUnit.SECONDS, new ArrayBlockingQueue<Runnable>(5));
+      ExecutorService threadPoolExecutor = Executors.newFixedThreadPool(2);
+      
+      Runnable runnable1 = () -> {try {Thread.sleep(3000L);} catch (InterruptedException e) { e.printStackTrace();} System.out.println(Thread.currentThread().getName());};
+      Thread ccThread1 = new Thread(runnable1 , "runnable1");
+      
+      Runnable runnable2 = () -> {try {Thread.sleep(3000L);} catch (InterruptedException e) { e.printStackTrace();} System.out.println(Thread.currentThread().getName());};
+      Thread ccThread2 = new Thread(runnable2 , "runnable2");
+      
+      Runnable runnable3 = () -> {try {Thread.sleep(3000L);} catch (InterruptedException e) { e.printStackTrace();} System.out.println(Thread.currentThread().getName());};
+      Thread ccThread3 = new Thread(runnable3 , "runnable3");
+      
+      Runnable runnable4 = () -> {try {Thread.sleep(3000L);} catch (InterruptedException e) { e.printStackTrace();} System.out.println(Thread.currentThread().getName());};
+      Thread ccThread4 = new Thread(runnable4 , "runnable4");
+      
+      Runnable runnable5 = () -> {try {Thread.sleep(3000L);} catch (InterruptedException e) { e.printStackTrace();} System.out.println(Thread.currentThread().getName());};
+      Thread ccThread5 = new Thread(runnable5 , "runnable5");
+      
+      long start = new Date().getTime();
+      threadPoolExecutor.execute(ccThread1);
+      threadPoolExecutor.execute(ccThread2);
+      threadPoolExecutor.execute(ccThread3);
+      threadPoolExecutor.execute(ccThread4);
+      threadPoolExecutor.execute(ccThread5);
+      threadPoolExecutor.shutdown();
+      while (!threadPoolExecutor.awaitTermination(10, TimeUnit.SECONDS)) {
+      }    
+      long end = new Date().getTime();
+      System.out.println((end - start) + "ms");
+    //}
   }
 
   public void execute() throws MojoExecutionException {
     if (this.inputDirectory == null && this.includeFiles == null)
       throw new MojoExecutionException(
           "Either parameter 'includeFiles' or 'inputDirectory' must be specified");
-    this.filesHandler.mergeIncludeFilesList();
+    
+    List<File> effectiveInputFilesList = this.filesHandler.getEffectiveInputFilesList(this.inputDirectory, this.includeFiles, this.failOnNoInputFilesFound);
+    ExecutorService executorService = Executors.newFixedThreadPool(this.maxNumberOfThreads);
     if (this.outputFile == null) {
-        this.includeFiles.stream().forEach(file -> {
+          effectiveInputFilesList.stream().forEach(file -> {
           try {
           //TODO print information on file being processed
             Set<String> fileList = this.filesHandler.getFileWithDepsList(file);
             //TODO use thread POOL 
             if(fileList.size() > 0) {
-              Thread ccThread = new Thread(new RunClosureCompiler(
-                  getCommandLine(this.outputDirectory.getAbsolutePath() + "/" + this.filesHandler.getResultFileRelativePath(file, this.suffix), 
-                      fileList.toArray(new String[]{}))
-                  ));
+              String outputFilePath = this.outputDirectory.getAbsolutePath() + File.separator + this.filesHandler.getResultFileRelativePath(file, this.suffix);
+              RunClosureCompiler compilerRunner = new RunClosureCompiler(getCommandLine(outputFilePath, fileList.toArray(new String[]{}) ), this.lock);
+              compilerRunner.addObserver(this);
+              executorService.execute(compilerRunner);
               //TODO make compiler use relative path for module name
-              //FIXME fix name C:\Users\ismae\eclipse_workspaces\closure-compiler-maven-plugin\test-maven-plugin\target\test-maven-plugin-0.0.1-SNAPSHOT\WEB-INF\js\min/\src\main\webapp\WEB-INF\js\base-service.jsbase-service.js
-              ccThread.start();
-              ccThread.join();
             }
-          } catch (InterruptedException e) {
-            e.printStackTrace();
-          } catch (IOException e) {
+          }  catch (IOException e) {
             e.printStackTrace();
           }
         });
     } else {
-      try {
-        String[] inputArray = this.includeFiles.stream().map(file -> {
+        String[] inputArray = effectiveInputFilesList.stream().map(file -> {
                                                 return file.getPath();
                                               }).collect(Collectors.toList()).toArray(new String[] {});
         if(inputArray.length > 0) {
-          Thread ccThread = new Thread(new RunClosureCompiler(
-              getCommandLine(this.outputFile.getPath(), inputArray)));
-          ccThread.start();
-          ccThread.join();
+          RunClosureCompiler compilerRunner = new RunClosureCompiler(getCommandLine(this.outputFile.getPath(), inputArray), this.lock);
+          compilerRunner.addObserver(this);
+          executorService.execute(compilerRunner);
         }
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-      } catch (SecurityException e) {
-        System.out.println("OK");
-      }
+    }
+    awaitTasksTermination(executorService);
+    this.securityManager.enableSystemExit();
+  }
+  
+  private void awaitTasksTermination(ExecutorService executorService) {
+    executorService.shutdown();
+    try {
+      while (!executorService.awaitTermination(10, TimeUnit.SECONDS)) {}
+    } catch (InterruptedException e) {
+      e.printStackTrace();
+    }  
+  }
+
+  @Override
+  public void update(Observable o, Object obj) {
+    if(obj != null) {   
+      Notification notif = (Notification) obj;
+      int pos = IntStream.range(0, notif.getArgs().length).filter(i -> "--js_output_file".equals(notif.getArgs()[i])).findFirst().getAsInt();
+      getLog().info(notif.getDescription() + " to: " + notif.getArgs()[pos + 1]);
     }
   }
   
