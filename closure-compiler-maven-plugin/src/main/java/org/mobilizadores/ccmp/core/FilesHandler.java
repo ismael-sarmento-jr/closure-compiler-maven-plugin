@@ -20,7 +20,6 @@ import com.google.javascript.jscomp.deps.JsFileRegexParser;
 public class FilesHandler {
   
   Logger logger = Logger.getLogger(FileHandler.class.getName());
-  
   JsFileRegexParser jsParser = new JsFileRegexParser(new LoggerErrorManager(this.logger));
   
   private List<File> effectiveInputFilesList;
@@ -48,8 +47,10 @@ public class FilesHandler {
    * @throws IOException
    */
   public Set<String> getFileWithDepsList(File file) throws IOException {
-    DependencyInfo dependencyInfo = this.jsParser.parseFile(file.getPath(), file.getName(), SourceFile.fromFile(file.getPath()).getCode());
     Set<String> resultList = new HashSet<>();
+    resultList.add(file.getPath());
+    
+    DependencyInfo dependencyInfo = this.jsParser.parseFile(file.getPath(), file.getName(), SourceFile.fromFile(file.getPath()).getCode());
     dependencyInfo.getRequires().stream().forEach(dep -> {
           try {
             resultList.addAll( getFileWithDepsList(new File( getAbsolutePath(dep.getRawText(), file.getPath()))));
@@ -58,7 +59,6 @@ public class FilesHandler {
           }
     });
     
-    resultList.add(file.getPath());
     return resultList;
   }
   

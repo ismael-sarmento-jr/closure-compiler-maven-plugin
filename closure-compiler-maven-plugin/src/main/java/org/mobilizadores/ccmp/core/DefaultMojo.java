@@ -5,18 +5,14 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Observable;
 import java.util.Observer;
 import java.util.Set;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
@@ -51,7 +47,7 @@ public class DefaultMojo extends AbstractMojo implements Observer {
   @Parameter
   String suffix;
 
-  @Parameter
+  @Parameter(required = true)
   File inputDirectory;
 
   @Parameter(alias = "js")
@@ -59,9 +55,6 @@ public class DefaultMojo extends AbstractMojo implements Observer {
 
   @Parameter(defaultValue = "target/${project.build.finalName}/WEB-INF/js")
   File outputDirectory;
-  
-  @Parameter(defaultValue = "${project.basedir}", readonly = true)
-  File baseDir;
 
   // @Parameter(alias = "level", defaultValue = "SIMPLE_OPTIMIZATIONS", required = true)
   // CompilationLevel compilationLevel;
@@ -83,41 +76,7 @@ public class DefaultMojo extends AbstractMojo implements Observer {
     super();
     System.setSecurityManager(this.securityManager);
   }
-  
-  public static void main(String[] args) throws InterruptedException {
-    //for (int i = 0; i < 10; i++) {
-      
-//      ThreadPoolExecutor threadPoolExecutor = new ThreadPoolExecutor(3, 3, 0, TimeUnit.SECONDS, new ArrayBlockingQueue<Runnable>(5));
-      ExecutorService threadPoolExecutor = Executors.newFixedThreadPool(2);
-      
-      Runnable runnable1 = () -> {try {Thread.sleep(3000L);} catch (InterruptedException e) { e.printStackTrace();} System.out.println(Thread.currentThread().getName());};
-      Thread ccThread1 = new Thread(runnable1 , "runnable1");
-      
-      Runnable runnable2 = () -> {try {Thread.sleep(3000L);} catch (InterruptedException e) { e.printStackTrace();} System.out.println(Thread.currentThread().getName());};
-      Thread ccThread2 = new Thread(runnable2 , "runnable2");
-      
-      Runnable runnable3 = () -> {try {Thread.sleep(3000L);} catch (InterruptedException e) { e.printStackTrace();} System.out.println(Thread.currentThread().getName());};
-      Thread ccThread3 = new Thread(runnable3 , "runnable3");
-      
-      Runnable runnable4 = () -> {try {Thread.sleep(3000L);} catch (InterruptedException e) { e.printStackTrace();} System.out.println(Thread.currentThread().getName());};
-      Thread ccThread4 = new Thread(runnable4 , "runnable4");
-      
-      Runnable runnable5 = () -> {try {Thread.sleep(3000L);} catch (InterruptedException e) { e.printStackTrace();} System.out.println(Thread.currentThread().getName());};
-      Thread ccThread5 = new Thread(runnable5 , "runnable5");
-      
-      long start = new Date().getTime();
-      threadPoolExecutor.execute(ccThread1);
-      threadPoolExecutor.execute(ccThread2);
-      threadPoolExecutor.execute(ccThread3);
-      threadPoolExecutor.execute(ccThread4);
-      threadPoolExecutor.execute(ccThread5);
-      threadPoolExecutor.shutdown();
-      while (!threadPoolExecutor.awaitTermination(10, TimeUnit.SECONDS)) {
-      }    
-      long end = new Date().getTime();
-      System.out.println((end - start) + "ms");
-    //}
-  }
+ 
 
   public void execute() throws MojoExecutionException {
     if (this.inputDirectory == null && this.includeFiles == null)
@@ -129,15 +88,15 @@ public class DefaultMojo extends AbstractMojo implements Observer {
     if (this.outputFile == null) {
           effectiveInputFilesList.stream().forEach(file -> {
           try {
-          //TODO print information on file being processed
             Set<String> fileList = this.filesHandler.getFileWithDepsList(file);
-            //TODO use thread POOL 
             if(fileList.size() > 0) {
               String outputFilePath = this.outputDirectory.getAbsolutePath() + File.separator + this.filesHandler.getResultFileRelativePath(file, this.suffix);
               RunClosureCompiler compilerRunner = new RunClosureCompiler(getCommandLine(outputFilePath, fileList.toArray(new String[]{}) ), this.lock);
               compilerRunner.addObserver(this);
               executorService.execute(compilerRunner);
+              //TODO put file in respective relative path
               //TODO make compiler use relative path for module name
+              //TODO execute so WAR file without overriding compressed files without suffix
             }
           }  catch (IOException e) {
             e.printStackTrace();
@@ -181,6 +140,8 @@ public class DefaultMojo extends AbstractMojo implements Observer {
       Class<?> flagsClass = Class.forName("com.google.javascript.jscomp.CommandLineRunner$Flags");
       commandList.addAll( getPrimitiveArgs(flagsClass));
       
+      commandList.add("--js_module_root");
+      commandList.add(this.inputDirectory.getPath());
       commandList.add("--js_output_file");
       commandList.add(outputFile);
       Arrays.asList(inputFiles).forEach(file -> {
