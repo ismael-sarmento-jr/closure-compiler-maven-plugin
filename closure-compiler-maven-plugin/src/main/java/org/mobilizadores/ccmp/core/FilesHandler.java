@@ -65,10 +65,10 @@ public class FilesHandler {
   /**
    * @return the relative path - including the name of the file - in which the compressed file will be written.
    */
-  public String getResultFileRelativePath(File file, String suffix) {
+  public String getResultFileRelativePath(File baseDirectory, File file, String suffix) {
     String fileExtension = Files.getFileExtension(file.getName());
     String fileName = suffix != null ? file.getName().replace(fileExtension, suffix + "." + fileExtension) : file.getName();
-    return fileName;
+    return file.getParent().replace(baseDirectory.getPath(), "") + File.separator + fileName;
   }
   
   /**

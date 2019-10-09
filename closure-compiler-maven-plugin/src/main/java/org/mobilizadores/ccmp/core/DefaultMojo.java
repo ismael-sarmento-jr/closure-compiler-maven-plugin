@@ -90,12 +90,10 @@ public class DefaultMojo extends AbstractMojo implements Observer {
           try {
             Set<String> fileList = this.filesHandler.getFileWithDepsList(file);
             if(fileList.size() > 0) {
-              String outputFilePath = this.outputDirectory.getAbsolutePath() + File.separator + this.filesHandler.getResultFileRelativePath(file, this.suffix);
+              String outputFilePath = this.outputDirectory.getAbsolutePath() + File.separator + this.filesHandler.getResultFileRelativePath(this.inputDirectory, file, this.suffix);
               RunClosureCompiler compilerRunner = new RunClosureCompiler(getCommandLine(outputFilePath, fileList.toArray(new String[]{}) ), this.lock);
               compilerRunner.addObserver(this);
               executorService.execute(compilerRunner);
-              //TODO put file in respective relative path
-              //TODO make compiler use relative path for module name
               //TODO execute so WAR file without overriding compressed files without suffix
             }
           }  catch (IOException e) {
