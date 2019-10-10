@@ -2,7 +2,7 @@ package org.mobilizadores.ccmp.core;
 
 import java.security.Permission;
 
-public class StealingSecurityManager extends SecurityManager {
+public class ContextHoldingSecurityManager extends SecurityManager {
   
   SecurityManager _prevMgr = System.getSecurityManager();
   
@@ -20,7 +20,7 @@ public class StealingSecurityManager extends SecurityManager {
   public void enableSystemExit() {
     SecurityManager mgr = System.getSecurityManager();
     if (mgr == this) {
-      StealingSecurityManager smgr = (StealingSecurityManager) mgr;
+      ContextHoldingSecurityManager smgr = (ContextHoldingSecurityManager) mgr;
       System.setSecurityManager(smgr.getPreviousMgr());
     } else
       System.setSecurityManager(null);

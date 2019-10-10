@@ -2,9 +2,7 @@ package org.mobilizadores.ccmp.core;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,13 +15,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import org.apache.commons.lang3.ClassUtils;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
-import org.kohsuke.args4j.Option;
 import com.google.javascript.jscomp.CompilationLevel;
 import com.google.javascript.jscomp.CompilerOptions;
 import com.google.javascript.jscomp.CompilerOptions.IsolationMode;
@@ -69,8 +65,9 @@ public class DefaultMojo extends AbstractMojo implements Observer {
 //  Map<String, Object> args;
 
   FilesHandler filesHandler = new FilesHandler();
+  CommandLineHelper clh = new CommandLineHelper();
   Object lock = new Object();
-  StealingSecurityManager securityManager = new StealingSecurityManager();
+  ContextHoldingSecurityManager securityManager = new ContextHoldingSecurityManager();
   
   public DefaultMojo() {
     super();
@@ -91,7 +88,7 @@ public class DefaultMojo extends AbstractMojo implements Observer {
             Set<String> fileList = this.filesHandler.getFileWithDepsList(file);
             if(fileList.size() > 0) {
               String outputFilePath = this.outputDirectory.getAbsolutePath() + File.separator + this.filesHandler.getResultFileRelativePath(this.inputDirectory, file, this.suffix);
-              RunClosureCompiler compilerRunner = new RunClosureCompiler(getCommandLine(outputFilePath, fileList.toArray(new String[]{}) ), this.lock);
+              RunClosureCompiler compilerRunner = new RunClosureCompiler(this.clh.getCommandLine(outputFilePath, this.inputDirectory, fileList.toArray(new String[]{}) ), this.lock);
               compilerRunner.addObserver(this);
               executorService.execute(compilerRunner);
               //TODO execute so WAR file without overriding compressed files without suffix
@@ -105,7 +102,7 @@ public class DefaultMojo extends AbstractMojo implements Observer {
                                                 return file.getPath();
                                               }).collect(Collectors.toList()).toArray(new String[] {});
         if(inputArray.length > 0) {
-          RunClosureCompiler compilerRunner = new RunClosureCompiler(getCommandLine(this.outputFile.getPath(), inputArray), this.lock);
+          RunClosureCompiler compilerRunner = new RunClosureCompiler(this.clh.getCommandLine(this.outputFile.getPath(), this.inputDirectory, inputArray), this.lock);
           compilerRunner.addObserver(this);
           executorService.execute(compilerRunner);
         }
@@ -123,6 +120,9 @@ public class DefaultMojo extends AbstractMojo implements Observer {
     }  
   }
 
+  /**
+   * Displays information in the terminal, using default {@link AbstractMojo} logger
+   */
   @Override
   public void update(Observable o, Object obj) {
     if(obj != null) {   
@@ -130,50 +130,6 @@ public class DefaultMojo extends AbstractMojo implements Observer {
       int pos = IntStream.range(0, notif.getArgs().length).filter(i -> "--js_output_file".equals(notif.getArgs()[i])).findFirst().getAsInt();
       getLog().info(notif.getDescription() + " to: " + notif.getArgs()[pos + 1]);
     }
-  }
-  
-  String[] getCommandLine(String outputFile, String... inputFiles) {
-    List<String> commandList = new ArrayList<>();
-    try {
-      Class<?> flagsClass = Class.forName("com.google.javascript.jscomp.CommandLineRunner$Flags");
-      commandList.addAll( getPrimitiveArgs(flagsClass));
-      
-      commandList.add("--js_module_root");
-      commandList.add(this.inputDirectory.getPath());
-      commandList.add("--js_output_file");
-      commandList.add(outputFile);
-      Arrays.asList(inputFiles).forEach(file -> {
-        commandList.add("--js");
-        commandList.add(file);
-      });
-    } catch (ClassNotFoundException e) {
-      e.printStackTrace();
-    }
-    return commandList.toArray(new String[] {});
-  }
-
-
-  List<String>  getPrimitiveArgs(Class<?> flagsClass) {
-    List<String> commandList = new ArrayList<String>();
-    Field[] parameters = DefaultMojo.class.getDeclaredFields();
-    parameters[0].isAnnotationPresent(Parameter.class);
-    Arrays.asList(parameters).stream().forEach(parameter -> {
-      if(ClassUtils.isPrimitiveOrWrapper(parameter.getType())) {
-        if (parameter.isAnnotationPresent(Parameter.class)) {
-          try {
-            Field flag = flagsClass.getDeclaredField(parameter.getAnnotation(Parameter.class).alias());
-            if (flag.isAnnotationPresent(Option.class)) {
-              commandList.add(flag.getDeclaredAnnotation(Option.class).name());
-              commandList.add(String.valueOf(parameter.get(this)));
-            }
-          } catch (NoSuchFieldException | SecurityException | IllegalArgumentException
-              | IllegalAccessException e) {
-            e.printStackTrace();
-          }
-        }
-      }
-    });
-    return commandList;
   }
   
   
@@ -286,29 +242,9 @@ public class DefaultMojo extends AbstractMojo implements Observer {
   @Parameter
   List<String> commonJsPathPrefix = new ArrayList<>();
   @Parameter
-  List<String> moduleRoot = new ArrayList<>();
-  @Parameter
-  @Deprecated
-  String commonJsEntryModule;
-  @Parameter
-  @Deprecated
-  boolean transformAmdModules = false;
-  @Parameter
   boolean processClosurePrimitives = true;
   @Parameter
-  @Deprecated
-  boolean manageClosureDependencies = false;
-  @Parameter
-  @Deprecated
-  boolean onlyClosureDependencies = false;
-  @Parameter
-  @Deprecated
-  List<String> closureEntryPoint = new ArrayList<>();
-  @Parameter
   boolean angularPass = false;
-  @Parameter
-  @Deprecated
-  boolean polymerPass = false;
   @Parameter
   Integer polymerVersion = null;
   @Parameter
