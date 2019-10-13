@@ -13,11 +13,21 @@
   </properties>
 
   <dependencies>
+  	<!-- <dependency>
+      <groupId>org.apache.maven.plugins</groupId>
+      <artifactId>maven-resources-plugin</artifactId>
+      <version>3.1.0</version>
+    </dependency>
   	<dependency>
-	    <groupId>org.mozilla</groupId>
-	    <artifactId>rhino</artifactId>
-	    <version>1.7.11</version>
-	</dependency>
+      <groupId>org.apache.maven.shared</groupId>
+      <artifactId>maven-filtering</artifactId>
+      <version>3.1.1</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.maven.shared</groupId>
+      <artifactId>maven-shared-utils</artifactId>
+      <version>3.2.1</version>
+    </dependency> -->
   	<dependency>
 	  <groupId>com.google.javascript</groupId>
 	  <artifactId>closure-compiler</artifactId>

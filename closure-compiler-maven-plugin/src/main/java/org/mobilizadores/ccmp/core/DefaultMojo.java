@@ -20,7 +20,6 @@ import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
-import com.google.javascript.jscomp.CompilationLevel;
 import com.google.javascript.jscomp.CompilerOptions;
 import com.google.javascript.jscomp.CompilerOptions.IsolationMode;
 import com.google.javascript.jscomp.PolymerExportPolicy;
@@ -46,8 +45,8 @@ public class DefaultMojo extends AbstractMojo implements Observer {
   @Parameter(required = true)
   File inputDirectory;
 
-  @Parameter(alias = "js")
-  List<File> includeFiles;
+  @Parameter(alias = "includeFiles")
+  List<File> js;
 
   @Parameter(defaultValue = "target/${project.build.finalName}/WEB-INF/js")
   File outputDirectory;
@@ -58,8 +57,8 @@ public class DefaultMojo extends AbstractMojo implements Observer {
   /**
    * If the outputFile is not specified, then the files are going to be minified seperately.
    */
-  @Parameter(alias = "jsOutputFile")
-  File outputFile;
+  @Parameter(alias = "outputFile")
+  File jsOutputFile;
 
 //  @Parameter
 //  Map<String, Object> args;
@@ -76,22 +75,23 @@ public class DefaultMojo extends AbstractMojo implements Observer {
  
 
   public void execute() throws MojoExecutionException {
-    if (this.inputDirectory == null && this.includeFiles == null)
+    if (this.inputDirectory == null && this.js == null)
       throw new MojoExecutionException(
           "Either parameter 'includeFiles' or 'inputDirectory' must be specified");
     
-    List<File> effectiveInputFilesList = this.filesHandler.getEffectiveInputFilesList(this.inputDirectory, this.includeFiles, this.failOnNoInputFilesFound);
+    List<File> effectiveInputFilesList = this.filesHandler.getEffectiveInputFilesList(this.inputDirectory, this.js, this.failOnNoInputFilesFound);
     ExecutorService executorService = Executors.newFixedThreadPool(this.maxNumberOfThreads);
-    if (this.outputFile == null) {
+    if (this.jsOutputFile == null) {
           effectiveInputFilesList.stream().forEach(file -> {
           try {
             Set<String> fileList = this.filesHandler.getFileWithDepsList(file);
             if(fileList.size() > 0) {
               String outputFilePath = this.outputDirectory.getAbsolutePath() + File.separator + this.filesHandler.getResultFileRelativePath(this.inputDirectory, file, this.suffix);
-              RunClosureCompiler compilerRunner = new RunClosureCompiler(this.clh.getCommandLine(outputFilePath, this.inputDirectory, fileList.toArray(new String[]{}) ), this.lock);
+              RunClosureCompiler compilerRunner = new RunClosureCompiler(this.clh.getCommandLine(outputFilePath, this.inputDirectory, this, fileList.toArray(new String[]{}) ), this.lock);
               compilerRunner.addObserver(this);
               executorService.execute(compilerRunner);
-              //TODO execute so WAR file without overriding compressed files without suffix
+              //FIXME implement compression overriding files without suffix
+              //FIXME compiler log and plugin log superpose each other and output is mixed
             }
           }  catch (IOException e) {
             e.printStackTrace();
@@ -102,7 +102,7 @@ public class DefaultMojo extends AbstractMojo implements Observer {
                                                 return file.getPath();
                                               }).collect(Collectors.toList()).toArray(new String[] {});
         if(inputArray.length > 0) {
-          RunClosureCompiler compilerRunner = new RunClosureCompiler(this.clh.getCommandLine(this.outputFile.getPath(), this.inputDirectory, inputArray), this.lock);
+          RunClosureCompiler compilerRunner = new RunClosureCompiler(this.clh.getCommandLine(this.jsOutputFile.getPath(), this.inputDirectory, this, inputArray), this.lock);
           compilerRunner.addObserver(this);
           executorService.execute(compilerRunner);
         }
@@ -141,17 +141,17 @@ public class DefaultMojo extends AbstractMojo implements Observer {
   @Parameter
   Integer browserFeaturesetYear = 0;
   @Parameter
-  boolean displayHelp = false;
+  Boolean displayHelp = false;
   @Parameter
-  boolean printTree = false;
+  Boolean printTree = false;
   @Parameter
-  boolean printAst = false;
+  Boolean printAst = false;
   @Parameter
-  boolean printPassGraph = false;
+  Boolean printPassGraph = false;
   @Parameter
-  boolean emitUseStrict = true;
+  Boolean emitUseStrict = true;
   @Parameter
-  boolean strictModeInput = true;
+  Boolean strictModeInput = true;
   @Parameter
   CompilerOptions.DevMode jscompDevMode = CompilerOptions.DevMode.OFF;
   @Parameter
@@ -169,15 +169,15 @@ public class DefaultMojo extends AbstractMojo implements Observer {
   @Parameter
   String variableMapOutputFile = "";
   @Parameter
-  boolean createNameMapFiles = false;
+  Boolean createNameMapFiles = false;
   @Parameter
-  boolean sourceMapIncludeSourcesContent = false;
+  Boolean sourceMapIncludeSourcesContent = false;
   @Parameter
   String propertyMapOutputFile = "";
   @Parameter
-  boolean thirdParty = false;
+  Boolean thirdParty = false;
   @Parameter
-  int summaryDetailLevel = 1;
+  Integer summaryDetailLevel = 1;
   @Parameter
   IsolationMode isolationMode = IsolationMode.NONE;
   @Parameter
@@ -199,7 +199,7 @@ public class DefaultMojo extends AbstractMojo implements Observer {
   @Parameter
   Boolean parseInlineSourceMaps = true;
   @Parameter
-  boolean applyInputSourceMaps = true;
+  Boolean applyInputSourceMaps = true;
   @Parameter
   List<String> jscompError = new ArrayList<>();
   @Parameter
@@ -210,49 +210,47 @@ public class DefaultMojo extends AbstractMojo implements Observer {
   List<String> define = new ArrayList<>();
   @Parameter
   String charset = "";
+  @Parameter(defaultValue = "SIMPLE")
+  String compilationLevel;
   @Parameter
-  String compilationLevel = "SIMPLE";
+  Integer numParallelThreads = 1;
   @Parameter
-  CompilationLevel compilationLevelParsed = null;
-  @Parameter
-  int numParallelThreads = 1;
-  @Parameter
-  boolean checksOnly = false;
+  Boolean checksOnly = false;
   @Parameter
   CompilerOptions.IncrementalCheckMode incrementalCheckMode =
       CompilerOptions.IncrementalCheckMode.OFF;
   @Parameter
-  boolean continueAfterErrors = false;
+  Boolean continueAfterErrors = false;
   @Parameter
-  boolean useTypesForOptimization = true;
+  Boolean useTypesForOptimization = true;
   @Parameter
-  boolean assumeFunctionWrapper = false;
+  Boolean assumeFunctionWrapper = false;
   @Parameter
   WarningLevel warningLevel = WarningLevel.DEFAULT;
   @Parameter
-  boolean debug = false;
+  Boolean debug = false;
   @Parameter
-  boolean generateExports = false;
+  Boolean generateExports = false;
   @Parameter
-  boolean exportLocalPropertyDefinitions = false;
+  Boolean exportLocalPropertyDefinitions = false;
   // @Parameter
   // List<FormattingOption> formatting = new ArrayList<>();
   @Parameter
-  boolean processCommonJsModules = false;
+  Boolean processCommonJsModules = false;
   @Parameter
   List<String> commonJsPathPrefix = new ArrayList<>();
   @Parameter
-  boolean processClosurePrimitives = true;
+  Boolean processClosurePrimitives = true;
   @Parameter
-  boolean angularPass = false;
+  Boolean angularPass = false;
   @Parameter
   Integer polymerVersion = null;
   @Parameter
   String polymerExportPolicy = PolymerExportPolicy.LEGACY.name();
   @Parameter
-  boolean chromePass = false;
+  Boolean chromePass = false;
   @Parameter
-  boolean dartPass = false;
+  Boolean dartPass = false;
   @Parameter
   String j2clPassMode = "AUTO";
   @Parameter
@@ -264,7 +262,7 @@ public class DefaultMojo extends AbstractMojo implements Observer {
   @Parameter
   String languageOut = "STABLE";
   @Parameter
-  boolean version = false;
+  Boolean version = false;
   @Parameter
   String translationsFile = "";
   @Parameter
@@ -290,9 +288,9 @@ public class DefaultMojo extends AbstractMojo implements Observer {
   // @Parameter
   // CompilerOptions.JsonStreamMode jsonStreamMode = CompilerOptions.JsonStreamMode.NONE;
   @Parameter
-  boolean preserveTypeAnnotations = false;
+  Boolean preserveTypeAnnotations = false;
   @Parameter
-  boolean injectLibraries = true;
+  Boolean injectLibraries = true;
   @Parameter
   List<String> forceInjectLibraries = new ArrayList<>();
   // @Parameter
@@ -300,9 +298,9 @@ public class DefaultMojo extends AbstractMojo implements Observer {
   @Parameter
   List<String> entryPoint = new ArrayList<>();
   @Parameter
-  boolean rewritePolyfills = true;
+  Boolean rewritePolyfills = true;
   @Parameter
-  boolean printSourceAfterEachPass = false;
+  Boolean printSourceAfterEachPass = false;
   @Parameter
   ModuleLoader.ResolutionMode moduleResolutionMode = ModuleLoader.ResolutionMode.BROWSER;
   @Parameter
@@ -312,8 +310,10 @@ public class DefaultMojo extends AbstractMojo implements Observer {
   // @Parameter
   // ErrorFormatOption errorFormat = ErrorFormatOption.STANDARD;
   @Parameter
-  boolean renaming = true;
+  Boolean renaming = true;
   @Parameter
-  boolean helpMarkdown = false;
+  Boolean helpMarkdown = false;
+  @Parameter
+  List<String> moduleRoot = new ArrayList<>();
 }
 

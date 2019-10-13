@@ -2,56 +2,97 @@ package org.mobilizadores.ccmp.core;
 
 import java.io.File;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.ClassUtils;
-import org.apache.maven.plugins.annotations.Parameter;
+import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.commons.lang3.reflect.MethodUtils;
 import org.kohsuke.args4j.Option;
 
 public class CommandLineHelper {
 
-  public String[] getCommandLine(String outputFile, File inputDirectory, String... inputFiles) {
+  public String[] getCommandLine(String outputFile, File inputDirectory, DefaultMojo mojo, String... inputFiles) {
     List<String> commandList = new ArrayList<>();
-    try {
-      Class<?> flagsClass = Class.forName("com.google.javascript.jscomp.CommandLineRunner$Flags");
-      commandList.addAll( getPrimitiveArgs(flagsClass));
-      
-      commandList.add("--js_module_root");
-      commandList.add(inputDirectory.getPath());
+      commandList.addAll( getPrimitiveArgs(mojo));
+//      commandList.add("--js_module_root");
+//      commandList.add(inputDirectory.getPath());
       commandList.add("--js_output_file");
       commandList.add(outputFile);
       Arrays.asList(inputFiles).forEach(file -> {
         commandList.add("--js");
         commandList.add(file);
       });
-    } catch (ClassNotFoundException e) {
-      e.printStackTrace();
-    }
     return commandList.toArray(new String[] {});
   }
 
-
-  public List<String>  getPrimitiveArgs(Class<?> flagsClass) {
+  public List<String>  getPrimitiveArgs(DefaultMojo mojo) {
     List<String> commandList = new ArrayList<String>();
-    Field[] parameters = DefaultMojo.class.getDeclaredFields();
-    parameters[0].isAnnotationPresent(Parameter.class);
-    Arrays.asList(parameters).stream().forEach(parameter -> {
-      if(ClassUtils.isPrimitiveOrWrapper(parameter.getType())) {
-        if (parameter.isAnnotationPresent(Parameter.class)) {
-          try {
-            Field flag = flagsClass.getDeclaredField(parameter.getAnnotation(Parameter.class).alias());
-            if (flag.isAnnotationPresent(Option.class)) {
-              commandList.add(flag.getDeclaredAnnotation(Option.class).name());
-              commandList.add(String.valueOf(parameter.get(this)));
-            }
-          } catch (NoSuchFieldException | SecurityException | IllegalArgumentException
-              | IllegalAccessException e) {
-            e.printStackTrace();
+    List<String> mojoParameters = Arrays.stream( DefaultMojo.class.getDeclaredFields()).map(field -> field.getName()).collect(Collectors.toList());
+    try {
+      Class<?> flagsClass = Class.forName("com.google.javascript.jscomp.CommandLineRunner$Flags");
+      Field[] options = flagsClass.getDeclaredFields();
+      Arrays.asList(options).stream().forEach(option -> {
+        try {
+          if(option.isAnnotationPresent(Option.class)) {
+              if (ClassUtils.isPrimitiveOrWrapper(option.getType()) || option.getType().isAssignableFrom(String.class)){
+                commandList.addAll(getPrimitiveArgs(mojo, mojoParameters, option));
+              } else
+                  if( Iterable.class.isAssignableFrom(option.getType())) {
+                    Class<?> listTypeClass = Class.forName(((ParameterizedType) option.getGenericType()).getActualTypeArguments()[0].getTypeName());
+                    if(ClassUtils.isPrimitiveOrWrapper(listTypeClass) || String.class.isAssignableFrom(listTypeClass)) {                      
+                      commandList.addAll(getIterableArgs(mojo, mojoParameters, option));
+                    }
+                  }
           }
+        } catch (ClassNotFoundException e) {}
+      });
+    } catch (ClassNotFoundException e1) {}
+    return commandList;
+  }
+
+
+  private List<String> getIterableArgs(DefaultMojo mojo, List<String> mojoParameters, Field option) {
+    List<String> commandList = new ArrayList<String>();
+    try {
+      if(mojoParameters.contains(option.getName())) {
+        Field mojoParameter = FieldUtils.getDeclaredField(DefaultMojo.class, option.getName(), true);
+        if(mojoParameter.get(mojo) != null) {                  
+          String optionName = option.getDeclaredAnnotation(Option.class).name();
+          Consumer consumer = new Consumer() {
+            @Override
+            public void accept(Object value) {
+              commandList.add(optionName);
+              commandList.add(value.toString());
+           }};
+           MethodUtils.invokeMethod(mojoParameter.get(mojo), "forEach", consumer);
         }
       }
-    });
+    } catch (SecurityException | IllegalArgumentException  | IllegalAccessException 
+        | NoSuchMethodException | InvocationTargetException e) {
+      e.printStackTrace();
+    }
+    return commandList;
+  }
+
+
+  private List<String> getPrimitiveArgs(DefaultMojo mojo, List<String> mojoParameters,  Field option) {
+    List<String> commandList = new ArrayList<String>();
+    try {
+      if(mojoParameters.contains(option.getName())) {
+        Field mojoParameter = DefaultMojo.class.getDeclaredField(option.getName());
+        if(mojoParameter.get(mojo) != null) {                  
+          commandList.add(option.getDeclaredAnnotation(Option.class).name());
+          commandList.add(String.valueOf(mojoParameter.get(mojo)));
+        }
+      }
+    } catch (NoSuchFieldException | SecurityException | IllegalArgumentException  | IllegalAccessException e) {
+      e.printStackTrace();
+    }
     return commandList;
   }
 }
