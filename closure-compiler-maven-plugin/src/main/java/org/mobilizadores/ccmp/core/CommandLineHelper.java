@@ -16,11 +16,11 @@ import org.kohsuke.args4j.Option;
 
 public class CommandLineHelper {
 
-  public String[] getCommandLine(String outputFile, File inputDirectory, DefaultMojo mojo, String... inputFiles) {
+  public String[] getCommandLine(String outputFile, File inputDirectory, ClosureCompilerMojo mojo, String... inputFiles) {
     List<String> commandList = new ArrayList<>();
-      commandList.addAll( getPrimitiveArgs(mojo));
-//      commandList.add("--js_module_root");
-//      commandList.add(inputDirectory.getPath());
+      commandList.addAll( getArgs(mojo));
+      commandList.add("--warning_level");
+      commandList.add("QUIET");
       commandList.add("--js_output_file");
       commandList.add(outputFile);
       Arrays.asList(inputFiles).forEach(file -> {
@@ -30,9 +30,9 @@ public class CommandLineHelper {
     return commandList.toArray(new String[] {});
   }
 
-  public List<String>  getPrimitiveArgs(DefaultMojo mojo) {
+  public List<String>  getArgs(ClosureCompilerMojo mojo) {
     List<String> commandList = new ArrayList<String>();
-    List<String> mojoParameters = Arrays.stream( DefaultMojo.class.getDeclaredFields()).map(field -> field.getName()).collect(Collectors.toList());
+    List<String> mojoParameters = Arrays.stream( ClosureCompilerMojo.class.getDeclaredFields()).map(field -> field.getName()).collect(Collectors.toList());
     try {
       Class<?> flagsClass = Class.forName("com.google.javascript.jscomp.CommandLineRunner$Flags");
       Field[] options = flagsClass.getDeclaredFields();
@@ -55,12 +55,16 @@ public class CommandLineHelper {
     return commandList;
   }
 
+  // TODO avoid 'duplicate extern' error
+  private List<String> removeDuplicates(List<String> commandList) {
+    return commandList = commandList.stream().distinct().collect(Collectors.toList());
+  }
 
-  private List<String> getIterableArgs(DefaultMojo mojo, List<String> mojoParameters, Field option) {
+  private List<String> getIterableArgs(ClosureCompilerMojo mojo, List<String> mojoParameters, Field option) {
     List<String> commandList = new ArrayList<String>();
     try {
       if(mojoParameters.contains(option.getName())) {
-        Field mojoParameter = FieldUtils.getDeclaredField(DefaultMojo.class, option.getName(), true);
+        Field mojoParameter = FieldUtils.getDeclaredField(ClosureCompilerMojo.class, option.getName(), true);
         if(mojoParameter.get(mojo) != null) {                  
           String optionName = option.getDeclaredAnnotation(Option.class).name();
           Consumer consumer = new Consumer() {
@@ -80,11 +84,11 @@ public class CommandLineHelper {
   }
 
 
-  private List<String> getPrimitiveArgs(DefaultMojo mojo, List<String> mojoParameters,  Field option) {
+  private List<String> getPrimitiveArgs(ClosureCompilerMojo mojo, List<String> mojoParameters,  Field option) {
     List<String> commandList = new ArrayList<String>();
     try {
       if(mojoParameters.contains(option.getName())) {
-        Field mojoParameter = DefaultMojo.class.getDeclaredField(option.getName());
+        Field mojoParameter = ClosureCompilerMojo.class.getDeclaredField(option.getName());
         if(mojoParameter.get(mojo) != null) {                  
           commandList.add(option.getDeclaredAnnotation(Option.class).name());
           commandList.add(String.valueOf(mojoParameter.get(mojo)));

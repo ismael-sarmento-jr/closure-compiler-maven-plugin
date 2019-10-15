@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.logging.FileHandler;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.maven.plugin.MojoExecutionException;
 import com.google.common.io.Files;
@@ -79,16 +80,21 @@ public class FilesHandler {
    */
   public List<File> getEffectiveInputFilesList(File inputDirectory, List<File> includeFiles, boolean failOnNoInputFilesFound) throws MojoExecutionException {
     this.effectiveInputFilesList = includeFiles == null ? new ArrayList<>() : includeFiles;
+    includeAllFilesInInputDirectory(inputDirectory);
+    if (failOnNoInputFilesFound && this.effectiveInputFilesList.isEmpty())
+      throw new MojoExecutionException("No javascript files were found.");
+    
+    return effectiveInputFilesList.stream().distinct().collect(Collectors.toList());
+  }
+
+  private void includeAllFilesInInputDirectory(File inputDirectory) {
     if (inputDirectory != null) {
       Files.fileTraverser().breadthFirst(inputDirectory).forEach(file -> {
-        if (file.isFile() && "js".equals(Files.getFileExtension(file.getName()))) {
+        if (file.isFile() && "js".equals(Files.getFileExtension(file.getName()))
+              && !file.getPath().contains("extern")) {
           this.effectiveInputFilesList.add(file);
         }
       });
     }
-    if (failOnNoInputFilesFound && this.effectiveInputFilesList.isEmpty())
-      throw new MojoExecutionException("No javascript files were found.");
-    
-    return this.effectiveInputFilesList;
   }
 }

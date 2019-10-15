@@ -31,7 +31,7 @@ import com.google.javascript.jscomp.deps.ModuleLoader;
  * @goal
  */
 @Mojo(name = "compress", defaultPhase = LifecyclePhase.PREPARE_PACKAGE)
-public class DefaultMojo extends AbstractMojo implements Observer {
+public class ClosureCompilerMojo extends AbstractMojo implements Observer {
   
   @Parameter(defaultValue = "true")
   Boolean failOnNoInputFilesFound;
@@ -45,8 +45,8 @@ public class DefaultMojo extends AbstractMojo implements Observer {
   @Parameter(required = true)
   File inputDirectory;
 
-  @Parameter(alias = "includeFiles")
-  List<File> js;
+  @Parameter(alias = "js")
+  List<File> includeFiles;
 
   @Parameter(defaultValue = "target/${project.build.finalName}/WEB-INF/js")
   File outputDirectory;
@@ -68,18 +68,18 @@ public class DefaultMojo extends AbstractMojo implements Observer {
   Object lock = new Object();
   ContextHoldingSecurityManager securityManager = new ContextHoldingSecurityManager();
   
-  public DefaultMojo() {
+  public ClosureCompilerMojo() {
     super();
     System.setSecurityManager(this.securityManager);
   }
  
 
   public void execute() throws MojoExecutionException {
-    if (this.inputDirectory == null && this.js == null)
+    if (this.inputDirectory == null && this.includeFiles == null)
       throw new MojoExecutionException(
           "Either parameter 'includeFiles' or 'inputDirectory' must be specified");
     
-    List<File> effectiveInputFilesList = this.filesHandler.getEffectiveInputFilesList(this.inputDirectory, this.js, this.failOnNoInputFilesFound);
+    List<File> effectiveInputFilesList = this.filesHandler.getEffectiveInputFilesList(this.inputDirectory, this.includeFiles, this.failOnNoInputFilesFound);
     ExecutorService executorService = Executors.newFixedThreadPool(this.maxNumberOfThreads);
     if (this.jsOutputFile == null) {
           effectiveInputFilesList.stream().forEach(file -> {
@@ -200,12 +200,13 @@ public class DefaultMojo extends AbstractMojo implements Observer {
   Boolean parseInlineSourceMaps = true;
   @Parameter
   Boolean applyInputSourceMaps = true;
-  @Parameter
-  List<String> jscompError = new ArrayList<>();
-  @Parameter
-  List<String> jscompWarning = new ArrayList<>();
-  @Parameter
-  List<String> jscompOff = new ArrayList<>();
+  //TODO remove: it's marked as unused in the clr
+//  @Parameter
+//  List<String> jscompError = new ArrayList<>();
+//  @Parameter
+//  List<String> jscompWarning = new ArrayList<>();
+//  @Parameter
+//  List<String> jscompOff = new ArrayList<>();
   @Parameter
   List<String> define = new ArrayList<>();
   @Parameter
@@ -225,8 +226,9 @@ public class DefaultMojo extends AbstractMojo implements Observer {
   Boolean useTypesForOptimization = true;
   @Parameter
   Boolean assumeFunctionWrapper = false;
+  //TODO set to default and implement method to handle parameter
   @Parameter
-  WarningLevel warningLevel = WarningLevel.DEFAULT;
+  WarningLevel warningLevel = WarningLevel.QUIET;
   @Parameter
   Boolean debug = false;
   @Parameter
