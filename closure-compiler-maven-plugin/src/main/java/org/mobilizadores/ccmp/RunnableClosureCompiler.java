@@ -1,4 +1,4 @@
-package org.mobilizadores.ccmp.core;
+package org.mobilizadores.ccmp;
 
 import java.io.PrintStream;
 import java.lang.reflect.Constructor;
@@ -7,7 +7,7 @@ import java.util.Observable;
 import org.apache.commons.lang3.reflect.MethodUtils;
 import com.google.javascript.jscomp.CommandLineRunner;
 
-class RunClosureCompiler extends Observable implements Runnable {
+class RunnableClosureCompiler extends Observable implements Runnable {
 
   public static final Integer SUCCESS = 0;
 
@@ -15,7 +15,7 @@ class RunClosureCompiler extends Observable implements Runnable {
   private String[] args;
   private PrintStream stream;
 
-  public RunClosureCompiler(String[] args, Object lock, PrintStream stream) {
+  public RunnableClosureCompiler(String[] args, Object lock, PrintStream stream) {
     super();
     this.lock = lock;
     this.args = args;
@@ -53,7 +53,7 @@ class RunClosureCompiler extends Observable implements Runnable {
       Constructor<CommandLineRunner> constructor = CommandLineRunner.class
           .getDeclaredConstructor(String[].class, PrintStream.class, PrintStream.class);
       constructor.setAccessible(true);
-      clr = constructor.newInstance(this.args, System.out, this.stream);
+      clr = constructor.newInstance(this.args, this.stream, this.stream);
     } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
         | NoSuchMethodException | InvocationTargetException e) {
       e.printStackTrace();

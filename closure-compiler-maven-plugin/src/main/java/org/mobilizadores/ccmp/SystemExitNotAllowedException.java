@@ -1,4 +1,4 @@
-package org.mobilizadores.ccmp.core;
+package org.mobilizadores.ccmp;
 
 public class SystemExitNotAllowedException extends SecurityException {
 

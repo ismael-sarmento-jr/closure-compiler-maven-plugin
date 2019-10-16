@@ -1,4 +1,4 @@
-package org.mobilizadores.ccmp.core;
+package org.mobilizadores.ccmp;
 
 import java.io.File;
 import java.io.IOException;
@@ -12,6 +12,7 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.maven.plugin.MojoExecutionException;
+import org.codehaus.plexus.util.FileUtils;
 import com.google.common.io.Files;
 import com.google.javascript.jscomp.LoggerErrorManager;
 import com.google.javascript.jscomp.SourceFile;
@@ -29,13 +30,13 @@ public class FilesHandler {
     String sysSeparator = File.separator;
     String escape = "\\";
     String[] modPath = moduleAbsPath.contains(sysSeparator) ? 
-                                moduleAbsPath.substring(0, moduleAbsPath.lastIndexOf(sysSeparator)) //get path without file name
+                                moduleAbsPath.substring(0, moduleAbsPath.lastIndexOf(sysSeparator)) //gets path without file name
                                 .split(escape + sysSeparator) :
                                 new String[] {moduleAbsPath};
     String prevDir = "../";
-    int countChangeDir = StringUtils.countMatches(depRelPath, prevDir); //TODO benchmark solution...taking too long
+    int countChangeDir = StringUtils.countMatches(depRelPath, prevDir); 
     if(modPath.length < countChangeDir)
-      return null; //FIXME
+      throw new RuntimeException("Invalid path: " + depRelPath);
     return String.join(sysSeparator, Arrays.copyOf(modPath, modPath.length - countChangeDir )) 
                             + sysSeparator
                             + depRelPath.substring(depRelPath.lastIndexOf(prevDir) + prevDir.length(), depRelPath.length());
@@ -61,6 +62,22 @@ public class FilesHandler {
     });
     
     return resultList;
+  }
+  
+  /**
+   * Copies all the files in the source folder to the destination folder, maintaining
+   * the hierarchy of subfolders, then deletes the temporary folder with its contents.
+   * @param source
+   * @param dest
+   */
+  public void copyFilesFromTempFolder(String source, String dest) {
+    try {
+      if(source != null && !source.isEmpty()) {
+        File temp = new File(source);
+        FileUtils.copyDirectoryStructure(temp, new File(dest));
+        FileUtils.deleteDirectory(temp);
+      }
+    } catch (IOException e) {e.printStackTrace();}
   }
   
   /**

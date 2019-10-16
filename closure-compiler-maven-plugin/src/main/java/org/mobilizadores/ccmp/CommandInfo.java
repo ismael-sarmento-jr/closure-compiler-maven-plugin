@@ -1,4 +1,4 @@
-package org.mobilizadores.ccmp.core;
+package org.mobilizadores.ccmp;
 
 import java.io.PrintStream;
 import java.lang.reflect.Constructor;
