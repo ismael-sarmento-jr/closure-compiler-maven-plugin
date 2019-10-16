@@ -13,11 +13,13 @@ class RunClosureCompiler extends Observable implements Runnable {
 
   private Object lock;
   private String[] args;
+  private PrintStream stream;
 
-  public RunClosureCompiler(String[] args, Object lock) {
+  public RunClosureCompiler(String[] args, Object lock, PrintStream stream) {
     super();
     this.lock = lock;
     this.args = args;
+    this.stream = stream;
   }
 
   @Override
@@ -51,7 +53,7 @@ class RunClosureCompiler extends Observable implements Runnable {
       Constructor<CommandLineRunner> constructor = CommandLineRunner.class
           .getDeclaredConstructor(String[].class, PrintStream.class, PrintStream.class);
       constructor.setAccessible(true);
-      clr = constructor.newInstance(this.args, System.out, System.err);
+      clr = constructor.newInstance(this.args, System.out, this.stream);
     } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
         | NoSuchMethodException | InvocationTargetException e) {
       e.printStackTrace();

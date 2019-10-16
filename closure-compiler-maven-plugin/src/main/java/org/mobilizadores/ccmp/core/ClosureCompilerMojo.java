@@ -1,7 +1,11 @@
 package org.mobilizadores.ccmp.core;
 
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -24,12 +28,9 @@ import com.google.javascript.jscomp.CompilerOptions;
 import com.google.javascript.jscomp.CompilerOptions.IsolationMode;
 import com.google.javascript.jscomp.PolymerExportPolicy;
 import com.google.javascript.jscomp.SourceMap;
-import com.google.javascript.jscomp.WarningLevel;
 import com.google.javascript.jscomp.deps.ModuleLoader;
 
-/**
- * @goal
- */
+
 @Mojo(name = "compress", defaultPhase = LifecyclePhase.PREPARE_PACKAGE)
 public class ClosureCompilerMojo extends AbstractMojo implements Observer {
   
@@ -67,31 +68,46 @@ public class ClosureCompilerMojo extends AbstractMojo implements Observer {
   CommandLineHelper clh = new CommandLineHelper();
   Object lock = new Object();
   ContextHoldingSecurityManager securityManager = new ContextHoldingSecurityManager();
+  InternalStream stream;
   
   public ClosureCompilerMojo() {
     super();
     System.setSecurityManager(this.securityManager);
+    try {
+      this.stream = new InternalStream(new FileOutputStream("log.out"));
+    } catch (FileNotFoundException e) {}
   }
- 
 
   public void execute() throws MojoExecutionException {
     if (this.inputDirectory == null && this.includeFiles == null)
       throw new MojoExecutionException(
           "Either parameter 'includeFiles' or 'inputDirectory' must be specified");
     
-    List<File> effectiveInputFilesList = this.filesHandler.getEffectiveInputFilesList(this.inputDirectory, this.includeFiles, this.failOnNoInputFilesFound);
+    List<File> effectiveInputFilesList = this.filesHandler.getEffectiveInputFilesList(
+                                                                                      this.inputDirectory, 
+                                                                                      this.includeFiles, 
+                                                                                      this.failOnNoInputFilesFound
+                                                                                      );
     ExecutorService executorService = Executors.newFixedThreadPool(this.maxNumberOfThreads);
     if (this.jsOutputFile == null) {
           effectiveInputFilesList.stream().forEach(file -> {
           try {
             Set<String> fileList = this.filesHandler.getFileWithDepsList(file);
             if(fileList.size() > 0) {
-              String outputFilePath = this.outputDirectory.getAbsolutePath() + File.separator + this.filesHandler.getResultFileRelativePath(this.inputDirectory, file, this.suffix);
-              RunClosureCompiler compilerRunner = new RunClosureCompiler(this.clh.getCommandLine(outputFilePath, this.inputDirectory, this, fileList.toArray(new String[]{}) ), this.lock);
+              String outputFilePath = this.outputDirectory.getAbsolutePath() 
+                                          + File.separator 
+                                          + this.filesHandler.getResultFileRelativePath(this.inputDirectory, file, this.suffix);
+              RunClosureCompiler compilerRunner = new RunClosureCompiler(this.clh.getCommandLine(outputFilePath, 
+                                                                                                  this.inputDirectory, 
+                                                                                                  this, 
+                                                                                                  fileList.toArray(new String[]{}) 
+                                                                                                  ), 
+                                                                          this.lock, 
+                                                                          this.stream
+                                                                          );
               compilerRunner.addObserver(this);
               executorService.execute(compilerRunner);
               //FIXME implement compression overriding files without suffix
-              //FIXME compiler log and plugin log superpose each other and output is mixed
             }
           }  catch (IOException e) {
             e.printStackTrace();
@@ -102,12 +118,21 @@ public class ClosureCompilerMojo extends AbstractMojo implements Observer {
                                                 return file.getPath();
                                               }).collect(Collectors.toList()).toArray(new String[] {});
         if(inputArray.length > 0) {
-          RunClosureCompiler compilerRunner = new RunClosureCompiler(this.clh.getCommandLine(this.jsOutputFile.getPath(), this.inputDirectory, this, inputArray), this.lock);
+          RunClosureCompiler compilerRunner = new RunClosureCompiler(this.clh.getCommandLine(
+                                                                                              this.jsOutputFile.getPath(), 
+                                                                                              this.inputDirectory, 
+                                                                                              this, 
+                                                                                              inputArray
+                                                                                              ), 
+                                                                     this.lock, 
+                                                                     this.stream
+                                                                     );
           compilerRunner.addObserver(this);
           executorService.execute(compilerRunner);
         }
     }
     awaitTasksTermination(executorService);
+    this.stream.report();
     this.securityManager.enableSystemExit();
   }
   
@@ -118,6 +143,39 @@ public class ClosureCompilerMojo extends AbstractMojo implements Observer {
     } catch (InterruptedException e) {
       e.printStackTrace();
     }  
+  }
+  
+ public static class InternalStream extends PrintStream {
+    
+    private StringBuilder report = new StringBuilder();
+
+    public InternalStream(OutputStream out) {
+      super(out);
+    }
+
+    @Override
+    public void print(char[] s) {
+      this.report.append(s);
+    }
+
+    @Override
+    public void print(String s) {
+      this.report.append(s);
+    }
+
+    @Override
+    public void println(char[] x) {
+      this.report.append(x);
+    }
+
+    @Override
+    public void println(String x) {
+      this.report.append(x);
+    }
+
+    public void report() {
+      System.err.println(this.report.toString());
+    }
   }
 
   /**
@@ -153,6 +211,7 @@ public class ClosureCompilerMojo extends AbstractMojo implements Observer {
   @Parameter
   Boolean strictModeInput = true;
   @Parameter
+  //TODO set as string
   CompilerOptions.DevMode jscompDevMode = CompilerOptions.DevMode.OFF;
   @Parameter
   String loggingLevel = Level.WARNING.getName();
@@ -226,9 +285,8 @@ public class ClosureCompilerMojo extends AbstractMojo implements Observer {
   Boolean useTypesForOptimization = true;
   @Parameter
   Boolean assumeFunctionWrapper = false;
-  //TODO set to default and implement method to handle parameter
-  @Parameter
-  WarningLevel warningLevel = WarningLevel.QUIET;
+  @Parameter(defaultValue = "QUIET")
+  String warningLevel;
   @Parameter
   Boolean debug = false;
   @Parameter

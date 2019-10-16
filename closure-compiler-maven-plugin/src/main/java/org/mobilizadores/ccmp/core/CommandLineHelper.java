@@ -19,8 +19,6 @@ public class CommandLineHelper {
   public String[] getCommandLine(String outputFile, File inputDirectory, ClosureCompilerMojo mojo, String... inputFiles) {
     List<String> commandList = new ArrayList<>();
       commandList.addAll( getArgs(mojo));
-      commandList.add("--warning_level");
-      commandList.add("QUIET");
       commandList.add("--js_output_file");
       commandList.add(outputFile);
       Arrays.asList(inputFiles).forEach(file -> {
@@ -39,14 +37,16 @@ public class CommandLineHelper {
       Arrays.asList(options).stream().forEach(option -> {
         try {
           if(option.isAnnotationPresent(Option.class)) {
-              if (ClassUtils.isPrimitiveOrWrapper(option.getType()) || option.getType().isAssignableFrom(String.class)){
-                commandList.addAll(getPrimitiveArgs(mojo, mojoParameters, option));
-              } else
+//              if (ClassUtils.isPrimitiveOrWrapper(option.getType()) || option.getType().isAssignableFrom(String.class)){
+//                commandList.addAll(getPrimitiveArgs(mojo, mojoParameters, option));
+//              } else
                   if( Iterable.class.isAssignableFrom(option.getType())) {
                     Class<?> listTypeClass = Class.forName(((ParameterizedType) option.getGenericType()).getActualTypeArguments()[0].getTypeName());
                     if(ClassUtils.isPrimitiveOrWrapper(listTypeClass) || String.class.isAssignableFrom(listTypeClass)) {                      
                       commandList.addAll(getIterableArgs(mojo, mojoParameters, option));
                     }
+                  } else {
+                    commandList.addAll(getPrimitiveArgs(mojo, mojoParameters, option));
                   }
           }
         } catch (ClassNotFoundException e) {}
@@ -55,10 +55,6 @@ public class CommandLineHelper {
     return commandList;
   }
 
-  // TODO avoid 'duplicate extern' error
-  private List<String> removeDuplicates(List<String> commandList) {
-    return commandList = commandList.stream().distinct().collect(Collectors.toList());
-  }
 
   private List<String> getIterableArgs(ClosureCompilerMojo mojo, List<String> mojoParameters, Field option) {
     List<String> commandList = new ArrayList<String>();
@@ -89,7 +85,8 @@ public class CommandLineHelper {
     try {
       if(mojoParameters.contains(option.getName())) {
         Field mojoParameter = ClosureCompilerMojo.class.getDeclaredField(option.getName());
-        if(mojoParameter.get(mojo) != null) {                  
+        if(mojoParameter.get(mojo) != null 
+            && (ClassUtils.isPrimitiveOrWrapper(mojoParameter.getType()) || mojoParameter.getType().isAssignableFrom(String.class))) {                  
           commandList.add(option.getDeclaredAnnotation(Option.class).name());
           commandList.add(String.valueOf(mojoParameter.get(mojo)));
         }
