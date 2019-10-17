@@ -1,5 +1,22 @@
 package org.mobilizadores.ccmp;
-
+/*
+ * Licensed to Mobilizadores.org under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership. Mobilizadores licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.
+ * Complete information can be found at: https://dev.mobilizadores.com/licenses
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ * You may obtain a copy of the License at: http://www.apache.org/licenses/LICENSE-2.0
+ */
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -21,7 +38,14 @@ import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import com.google.javascript.jscomp.PolymerExportPolicy;
 
-
+/**
+ * This class is the default maven mojo of the closure compiler plugin. Its default
+ * goal is "compress" and the default lifecycle phase is "prepare package". 
+ * It uses multithreading to optimize the compression of the javascript files. It uses 
+ * a simple fixed size thread pool, initially set to length 10. It is an {@link Observer},
+ * that is adds itself to the runnables {@link RunnableClosureCompiler}, so information
+ * about the compression can be logged.
+ */
 @Mojo(name = "compress", defaultPhase = LifecyclePhase.PREPARE_PACKAGE)
 public class ClosureCompilerMojo extends AbstractMojo implements Observer {
   
@@ -45,7 +69,7 @@ public class ClosureCompilerMojo extends AbstractMojo implements Observer {
   @Parameter(defaultValue = "target/${project.build.finalName}/WEB-INF/js")
   File outputDirectory;
   /**
-   * If the outputFile is not specified, then the files are going to be minified separately.
+   * If the outputFile is not specified, then the files are going to be compressed separately.
    */
   @Parameter(alias = "jsOutputFile")
   File outputFile;
@@ -55,6 +79,11 @@ public class ClosureCompilerMojo extends AbstractMojo implements Observer {
    * *************************
    * ADVANCED PROPS
    * *************************/
+  /**
+   * Defines the size of a thread pool; it can be tunned by the plugin user,
+   * according to the number of output files to be produced, to obtain
+   * better performance.
+   */
   @Parameter(defaultValue = "10")
   Integer maxNumberOfThreads;
   @Parameter(defaultValue = "true")
@@ -243,6 +272,15 @@ public class ClosureCompilerMojo extends AbstractMojo implements Observer {
     } catch (FileNotFoundException e) {}
   }
 
+  /**
+   * Initiates the thread pool, calls the proper methods to get the complete list of files - 
+   * with their dependencies - and pass to the threads for compression. 
+   * The result of the 
+   * compression is delayed until the end of all threads, to avoid cross writing to the 
+   * default output. 
+   * The system exiting is disabled before the execution of the calls and re-enabled after
+   * all the tasks are finished. 
+   */
   public void execute() throws MojoExecutionException {
     if (this.inputDirectory == null && this.includeFiles == null)
       throw new MojoExecutionException(
@@ -285,20 +323,24 @@ public class ClosureCompilerMojo extends AbstractMojo implements Observer {
     this.securityManager.enableSystemExit();
   }
 
+  /**
+   * Uses the input and output files passed as parameters to get the formatted command line args
+   * and request a new instance of a observable runnable. Adds this mojo to the list of observers
+   * and then adds the runnable to the execution queue.
+   */
   private void queueCompilation(String outputFilePath, String[] inputArray) {
-    RunnableClosureCompiler runnableCc = getNewRunnableClosureCompiler(outputFilePath, inputArray);
+    String[] commandLine = this.clh.getCommandLine(outputFilePath, this.inputDirectory,inputArray);
+    RunnableClosureCompiler runnableCc = getNewRunnableClosureCompiler(commandLine );
     runnableCc.addObserver(this);
     executorPoolService.execute(runnableCc);
   }
 
-  public RunnableClosureCompiler getNewRunnableClosureCompiler(String outputFilePath, String[] inputArray) {
-    return new RunnableClosureCompiler(this.clh.getCommandLine(outputFilePath, 
-                                                                this.inputDirectory, 
-                                                                inputArray 
-                                                                ), 
-                                       this.lock, 
-                                       this.stream
-                                       );
+  /**
+   * @return A new instance of a runnable with the thread's lock, for synchronization, the mojo's stream, for
+   * delayed report and the args for the final command line.
+   */
+  public RunnableClosureCompiler getNewRunnableClosureCompiler(final String[] commandLine) {
+    return new RunnableClosureCompiler(commandLine, this.lock, this.stream);
   }
 
 
