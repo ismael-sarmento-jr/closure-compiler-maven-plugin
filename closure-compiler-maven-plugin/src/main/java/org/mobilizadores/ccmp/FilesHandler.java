@@ -40,23 +40,27 @@ public class FilesHandler {
   
   Logger logger = Logger.getLogger(FileHandler.class.getName());
   JsFileRegexParser jsParser = new JsFileRegexParser(new LoggerErrorManager(this.logger));
-  
+  public static final String PREV_DIR = "../";
+  public static final String SYS_SEPARATOR = File.separator;
+  public static final String ESCAPE = "\\";
   private List<File> effectiveInputFilesList;
 
-  public String getAbsolutePath(String depRelPath, String moduleAbsPath) {
-    String sysSeparator = File.separator;
-    String escape = "\\";
-    String[] modPath = moduleAbsPath.contains(sysSeparator) ? 
-                                moduleAbsPath.substring(0, moduleAbsPath.lastIndexOf(sysSeparator)) //gets path without file name
-                                .split(escape + sysSeparator) :
-                                new String[] {moduleAbsPath};
-    String prevDir = "../";
-    int countChangeDir = StringUtils.countMatches(depRelPath, prevDir); 
+  /**
+   * @param depRelPath path to the dependence file relative to the path of the file in which it's imported 
+   * @param sourceFileAbsPath absolute path (without the file name) for the file that requires the dependence
+   * @return The absolute path for the dependence file, given its relative path and the
+   * source file's absolute path.
+   */
+  public String getDepAbsolutePath(String depRelPath, String sourceFileAbsPath) {
+    String[] modPath = sourceFileAbsPath.contains(SYS_SEPARATOR) ? 
+                                sourceFileAbsPath.split(ESCAPE + SYS_SEPARATOR) :
+                                new String[] {sourceFileAbsPath};
+    int countChangeDir = StringUtils.countMatches(depRelPath, PREV_DIR); 
     if(modPath.length < countChangeDir)
-      throw new RuntimeException("Invalid path: " + depRelPath);
-    return String.join(sysSeparator, Arrays.copyOf(modPath, modPath.length - countChangeDir )) 
-                            + sysSeparator
-                            + depRelPath.substring(depRelPath.lastIndexOf(prevDir) + prevDir.length(), depRelPath.length());
+      throw new InvalidRelativePathException("Invalid path: " + depRelPath);
+    return String.join(SYS_SEPARATOR, Arrays.copyOf(modPath, modPath.length - countChangeDir )) 
+                            + SYS_SEPARATOR
+                            + depRelPath.substring(depRelPath.lastIndexOf(PREV_DIR) + PREV_DIR.length(), depRelPath.length());
   }
   
   /**
@@ -72,7 +76,12 @@ public class FilesHandler {
     DependencyInfo dependencyInfo = this.jsParser.parseFile(file.getPath(), file.getName(), SourceFile.fromFile(file.getPath()).getCode());
     dependencyInfo.getRequires().stream().forEach(dep -> {
           try {
-            resultList.addAll( getFileWithDepsList(new File( getAbsolutePath(dep.getRawText(), file.getPath()))));
+            resultList.addAll( getFileWithDepsList(new File( getDepAbsolutePath(dep.getRawText(), 
+                                                                                file.getPath().substring(0, file.getPath().lastIndexOf(SYS_SEPARATOR))
+                                                                                )
+                                                            )
+                                                  )
+                              );
           } catch (IOException e) {
             e.printStackTrace();
           }
@@ -98,7 +107,8 @@ public class FilesHandler {
   }
   
   /**
-   * @return the relative path - including the name of the file - in which the compressed file will be written.
+   * @return The relative path - including the name of the file - in which the compressed file will be written.
+   *            The path starts with a system dependent separator: '/' or '\'
    */
   public String getResultFileRelativePath(File baseDirectory, File file, String suffix) {
     String fileExtension = Files.getFileExtension(file.getName());
@@ -107,21 +117,21 @@ public class FilesHandler {
   }
   
   /**
-   * Finds javascript files in the inputDirectory and adds them to the includeFiles list.
+   * Finds distinct javascript files in the inputDirectory and adds them to the includeFiles list.
    * @param inputDirectory 
    * @param includeFiles 
    * @param failOnNoInputFilesFound 
    */
   public List<File> getEffectiveInputFilesList(File inputDirectory, List<File> includeFiles, boolean failOnNoInputFilesFound) throws MojoExecutionException {
     this.effectiveInputFilesList = includeFiles == null ? new ArrayList<>() : includeFiles;
-    includeAllFilesInInputDirectory(inputDirectory);
+    includeAllJSFilesInInputDirectory(inputDirectory);
     if (failOnNoInputFilesFound && this.effectiveInputFilesList.isEmpty())
       throw new MojoExecutionException("No javascript files were found.");
     
     return effectiveInputFilesList.stream().distinct().collect(Collectors.toList());
   }
 
-  private void includeAllFilesInInputDirectory(File inputDirectory) {
+  private void includeAllJSFilesInInputDirectory(File inputDirectory) {
     if (inputDirectory != null) {
       Files.fileTraverser().breadthFirst(inputDirectory).forEach(file -> {
         if (file.isFile() && "js".equals(Files.getFileExtension(file.getName()))

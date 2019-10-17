@@ -1,0 +1,1 @@
+import {test} from '../file11.js';
