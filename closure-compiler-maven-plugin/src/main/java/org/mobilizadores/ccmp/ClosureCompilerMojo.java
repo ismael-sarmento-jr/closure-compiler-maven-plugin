@@ -329,7 +329,7 @@ public class ClosureCompilerMojo extends AbstractMojo implements Observer {
    * and then adds the runnable to the execution queue.
    */
   private void queueCompilation(String outputFilePath, String[] inputArray) {
-    String[] commandLine = this.clh.getCommandLine(outputFilePath, this.inputDirectory,inputArray);
+    String[] commandLine = this.clh.getCommandLine(outputFilePath, this.inputDirectory, inputArray);
     RunnableClosureCompiler runnableCc = getNewRunnableClosureCompiler(commandLine );
     runnableCc.addObserver(this);
     executorPoolService.execute(runnableCc);

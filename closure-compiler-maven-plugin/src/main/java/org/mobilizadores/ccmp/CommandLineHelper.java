@@ -29,16 +29,55 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.ClassUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.commons.lang3.reflect.MethodUtils;
+import org.apache.maven.plugins.annotations.Parameter;
 import org.kohsuke.args4j.Option;
 
+/**
+ * This class contains utility methods to properly build the command line
+ * to be executed by the compressor. It wraps an instance of the maven mojo and 
+ * makes heavy use of reflection to set the values to the respective parameters.
+ * The terms args and options are used as synonyms.
+ */
 public class CommandLineHelper {
   
+  /**
+   * @Option.name in {@link com.google.javascript.jscomp.CommandLineRunner$Flags#jsOutputFile}
+   */
+  public static final String JS_OUTPUT_FILE_OPTION = "--js_output_file";
+  /**
+   * @Option.name in {@link com.google.javascript.jscomp.CommandLineRunner$Flags#js}
+   */
+  private static final String JS_OPTION = "--js";
+
+  /**
+   * Instance of the maven mojo with its parameters set
+   */
   private ClosureCompilerMojo mojo;
+  
+  /**
+   * The class in the closure compiler that contains the definition of each command line option
+   */
+  Class<?> optionsClass;
+  
+  /**
+   * The fields in the maven mojo class annotated with {@link Parameter}
+   */
+  List<String> mojoParameters;
 
   public CommandLineHelper(ClosureCompilerMojo mojo) {
     this.mojo = mojo;
+    this.mojoParameters = Arrays.stream( mojo.getClass().getDeclaredFields())
+                              .filter(field -> field.isAnnotationPresent(Parameter.class))
+                              .map(field -> field.getName())
+                              .collect(Collectors.toList());
+    try {
+      this.optionsClass = Class.forName("com.google.javascript.jscomp.CommandLineRunner$Flags");
+    } catch (ClassNotFoundException e) { e.printStackTrace(); }
   }
 
+  /**
+   * @return the final array of options for the command
+   */
   public String[] getCommandLine(String outputFile, File inputDirectory, String... inputFiles) {
     List<String> commandList = new ArrayList<>();
     commandList.addAll(getArgs());
@@ -46,49 +85,61 @@ public class CommandLineHelper {
     return commandList.toArray(new String[] {});
   }
 
-  private List<String> getFilesArgs(String outputFile, String... inputFiles) {
+  /**
+   * @param outputFile
+   * @param inputFiles
+   * @return
+   */
+  public List<String> getFilesArgs(String outputFile, String... inputFiles) {
     List<String> commandList = new ArrayList<>();
-    commandList.add("--js_output_file");
+    commandList.add(JS_OUTPUT_FILE_OPTION);
     commandList.add(outputFile);
     Arrays.asList(inputFiles).forEach(file -> {
-      commandList.add("--js");
+      commandList.add(JS_OPTION);
       commandList.add(file);
     });
     return commandList;
   }
 
+  /**
+   * @return 
+   *        the list of primitive and iterable args
+   */
   public List<String>  getArgs() {
     List<String> commandList = new ArrayList<String>();
-    List<String> mojoParameters = Arrays.stream( ClosureCompilerMojo.class.getDeclaredFields()).map(field -> field.getName()).collect(Collectors.toList());
-    try {
-      Class<?> flagsClass = Class.forName("com.google.javascript.jscomp.CommandLineRunner$Flags");
-      Field[] options = flagsClass.getDeclaredFields();
-      Arrays.asList(options).stream().forEach(option -> {
+    Field[] options = this.optionsClass.getDeclaredFields();
+    Arrays.asList(options).stream().forEach(option -> {
         try {
           if(option.isAnnotationPresent(Option.class)) {
               if( Iterable.class.isAssignableFrom(option.getType())) {
                  Class<?> listTypeClass = Class.forName(((ParameterizedType) option.getGenericType()).getActualTypeArguments()[0].getTypeName());
                  if(ClassUtils.isPrimitiveOrWrapper(listTypeClass) || String.class.isAssignableFrom(listTypeClass)) {                      
-                   commandList.addAll(getIterableArgs( mojoParameters, option));
+                   commandList.addAll(getIterableArgsPairs( option));
                  }
               } else {
-                 commandList.addAll(getPrimitiveArgs( mojoParameters, option));
+                 commandList.addAll(getPrimitiveArgPair( option));
               }
           }
         } catch (ClassNotFoundException e) {}
-      });
-    } catch (ClassNotFoundException e1) {}
+    });
     return commandList;
   }
 
-
-  private List<String> getIterableArgs(List<String> mojoParameters, Field option) {
+  /**
+   * 
+   * @param option
+   *               the arg to be set, as defined in the {@link CommandLineHelper#optionsClass}
+   * @return
+   *        a list of pairs containing the final option name and a value for each copy of option added
+   */
+  public List<String> getIterableArgsPairs(Field option) {
+    
+    final String optionName = option.getDeclaredAnnotation(Option.class).name();
     List<String> commandList = new ArrayList<String>();
     try {
       if(mojoParameters.contains(option.getName())) {
-        Field mojoParameter = FieldUtils.getDeclaredField(ClosureCompilerMojo.class, option.getName(), true);
+        Field mojoParameter = FieldUtils.getDeclaredField(mojo.getClass(), option.getName(), true);
         if(mojoParameter.get(mojo) != null) {                  
-          String optionName = option.getDeclaredAnnotation(Option.class).name();
           Consumer consumer = (value) -> {
               commandList.add(optionName);
               commandList.add(value.toString());
@@ -104,11 +155,17 @@ public class CommandLineHelper {
   }
 
 
-  private List<String> getPrimitiveArgs(List<String> mojoParameters,  Field option) {
+  /**
+   * @param option
+   *            the arg to be set, as defined in the {@link CommandLineHelper#optionsClass}
+   * @return
+   *        a pair of strings with the option name followed by it's value
+   */
+  public List<String> getPrimitiveArgPair(Field option) {
     List<String> commandList = new ArrayList<String>();
     try {
       if(mojoParameters.contains(option.getName())) {
-        Field mojoParameter = ClosureCompilerMojo.class.getDeclaredField(option.getName());
+        Field mojoParameter = mojo.getClass().getDeclaredField(option.getName());
         if(mojoParameter.get(mojo) != null 
             && (ClassUtils.isPrimitiveOrWrapper(mojoParameter.getType()) || mojoParameter.getType().isAssignableFrom(String.class))) {                  
           commandList.add(option.getDeclaredAnnotation(Option.class).name());

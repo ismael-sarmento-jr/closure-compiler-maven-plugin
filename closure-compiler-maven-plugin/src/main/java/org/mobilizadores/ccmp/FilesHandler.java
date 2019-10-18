@@ -52,15 +52,22 @@ public class FilesHandler {
    * source file's absolute path.
    */
   public String getDepAbsolutePath(String depRelPath, String sourceFileAbsPath) {
-    String[] modPath = sourceFileAbsPath.contains(SYS_SEPARATOR) ? 
-                                sourceFileAbsPath.split(ESCAPE + SYS_SEPARATOR) :
-                                new String[] {sourceFileAbsPath};
+    sourceFileAbsPath = normalizePath(sourceFileAbsPath);
+    String[] modPath = sourceFileAbsPath.contains(SYS_SEPARATOR) ? sourceFileAbsPath.split(ESCAPE + SYS_SEPARATOR) : new String[] {sourceFileAbsPath};
     int countChangeDir = StringUtils.countMatches(depRelPath, PREV_DIR); 
     if(modPath.length < countChangeDir)
       throw new InvalidRelativePathException("Invalid path: " + depRelPath);
     return String.join(SYS_SEPARATOR, Arrays.copyOf(modPath, modPath.length - countChangeDir )) 
                             + SYS_SEPARATOR
                             + depRelPath.substring(depRelPath.lastIndexOf(PREV_DIR) + PREV_DIR.length(), depRelPath.length());
+  }
+  
+  /**
+   * Replaces the file separators in the path by the system separators. 
+   */
+  public String normalizePath(String path) {
+    String match =  SYS_SEPARATOR.equals("/") ? "\\\\" : "\\/";
+    return path.replaceAll(match, ESCAPE + SYS_SEPARATOR);
   }
   
   /**

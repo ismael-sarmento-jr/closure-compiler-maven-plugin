@@ -33,11 +33,15 @@ public class FilesHandlerTest {
     depRelPath = "../../path.dep";
     depAbsPath = filesHandler.getDepAbsolutePath(depRelPath, moduleAbsPath);
     Assert.assertEquals("abs"+File.separator +"path.dep", depAbsPath);
-    
+  }
+  
+  @Test
+  public void testDepsAbsPathInvalidPath() {
     boolean exception = false;
     try {
-      depRelPath = "../../../../path.dep";
-      depAbsPath = filesHandler.getDepAbsolutePath(depRelPath, moduleAbsPath);
+      String moduleAbsPath = "abs/mod/path";
+      String depRelPath = "../../../../path.dep";
+      filesHandler.getDepAbsolutePath(depRelPath, moduleAbsPath);
     } catch (InvalidRelativePathException e) {
       exception = true;
     }
@@ -94,5 +98,18 @@ public class FilesHandlerTest {
     Assert.assertTrue(!list.isEmpty());
     long count = list.stream().filter(file -> file.equals(duplicateFile)).count();
     Assert.assertEquals(1L, count);
+    
+  }
+  
+  @Test
+  public void testFindDistinctJsFilesInDirectoriesFailOnNotFound() {
+    boolean exception = false;
+    File inputDirectory = new File("src/test/resources/dir1/dir2/dir3");
+    try {
+      filesHandler.getEffectiveInputFilesList(inputDirectory, new ArrayList<File>(), true);
+    } catch (MojoExecutionException e) {
+      exception = true;
+    }
+    Assert.assertTrue(exception);
   }
 }
