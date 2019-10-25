@@ -36,7 +36,6 @@ import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
-import com.google.javascript.jscomp.PolymerExportPolicy;
 
 /**
  * This class is the default maven mojo of the closure compiler plugin. Its default
@@ -110,9 +109,9 @@ public class ClosureCompilerMojo extends AbstractMojo implements Observer {
   @Parameter(defaultValue = "true")
   Boolean strictModeInput;
   @Parameter(defaultValue = "OFF")
-  String jscompDevMode;
+  String jscompDevMode = "OFF";
   @Parameter(defaultValue = "WARNING")
-  String loggingLevel;
+  String loggingLevel = "WARNING";
   @Parameter
   List<String> externs;
   @Parameter
@@ -161,8 +160,8 @@ public class ClosureCompilerMojo extends AbstractMojo implements Observer {
   List<String> define;
   @Parameter
   String charset;
-  @Parameter(defaultValue = "SIMPLE")
-  String compilationLevel;
+  @Parameter
+  String compilationLevel = "SIMPLE";
   @Parameter
   Integer numParallelThreads;
   @Parameter
@@ -176,7 +175,7 @@ public class ClosureCompilerMojo extends AbstractMojo implements Observer {
   @Parameter
   Boolean assumeFunctionWrapper;
   @Parameter(defaultValue = "QUIET")
-  String warningLevel;
+  String warningLevel = "QUIET";
   @Parameter
   Boolean debug;
   @Parameter
@@ -234,7 +233,7 @@ public class ClosureCompilerMojo extends AbstractMojo implements Observer {
   @Parameter
   List<String> conformanceConfigs;
   @Parameter(defaultValue = "BROWSER")
-  String environment;
+  String environment = "BROWSER";
   @Parameter(defaultValue = "NONE")
   String jsonStreamMode;
   @Parameter

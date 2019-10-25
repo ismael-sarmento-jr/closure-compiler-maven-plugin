@@ -117,10 +117,10 @@ public class CommandLineHelper {
               if( Iterable.class.isAssignableFrom(option.getType())) {
                  Class<?> listTypeClass = Class.forName(((ParameterizedType) option.getGenericType()).getActualTypeArguments()[0].getTypeName());
                  if(ClassUtils.isPrimitiveOrWrapper(listTypeClass) || String.class.isAssignableFrom(listTypeClass)) {                      
-                   commandList.addAll(getIterableArgsPairs( option));
+                   commandList.addAll(getIterableArgsPairs( option.getName()));
                  }
               } else {
-                 commandList.addAll(getPrimitiveArgPair( option));
+                 commandList.addAll(getPrimitiveArgPair( option.getName()));
               }
           }
         } catch (ClassNotFoundException e) {}
@@ -135,8 +135,8 @@ public class CommandLineHelper {
    * @return
    *        a list of pairs containing the final option name and a value for each copy of option added
    */
-  public List<String> getIterableArgsPairs(Field option) {
-    
+  public List<String> getIterableArgsPairs(String optionStr) {
+    Field option = FieldUtils.getDeclaredField(this.optionsClass, optionStr, true);
     final String optionName = option.getDeclaredAnnotation(Option.class).name();
     List<String> commandList = new ArrayList<String>();
     try {
@@ -159,13 +159,16 @@ public class CommandLineHelper {
 
 
   /**
+   * Checks if exists a mojo parameter equivalent to the option passed as parameter and if its value is not null
+   * and returns corresponding args pair.
    * @param option
    *            the arg to be set, as defined in the {@link CommandLineHelper#optionsClass}
    * @return
    *        a pair of strings with the option name followed by it's value
    */
-  public List<String> getPrimitiveArgPair(Field option) {
+  public List<String> getPrimitiveArgPair(String optionStr) {
     List<String> commandList = new ArrayList<String>();
+    Field option = FieldUtils.getDeclaredField(this.optionsClass, optionStr, true);
     try {
       if(mojoParameters.contains(option.getName())) {
         Field mojoParameter = FieldUtils.getDeclaredField(mojo.getClass(), option.getName(), true);
