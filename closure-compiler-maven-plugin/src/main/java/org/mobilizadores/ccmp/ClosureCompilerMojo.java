@@ -29,6 +29,8 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.maven.plugin.AbstractMojo;
@@ -50,10 +52,10 @@ public class ClosureCompilerMojo extends AbstractMojo implements Observer {
   
   FilesHandler filesHandler = new FilesHandler();
   CommandLineHelper clh = new CommandLineHelper(this);
-  Object lock = new Object();
+  Lock lock = new ReentrantLock();
   ContextHoldingSecurityManager securityManager = new ContextHoldingSecurityManager();
   ExecutorService executorPoolService;
-  InternalStream stream;
+  DelayedInternalStream stream;
  
   /*
    * *************************
@@ -267,7 +269,7 @@ public class ClosureCompilerMojo extends AbstractMojo implements Observer {
     super();
     System.setSecurityManager(this.securityManager);
     try {
-      this.stream = new InternalStream(new FileOutputStream("log.out"));
+      this.stream = new DelayedInternalStream(new FileOutputStream("log.out"));
     } catch (FileNotFoundException e) {}
   }
 

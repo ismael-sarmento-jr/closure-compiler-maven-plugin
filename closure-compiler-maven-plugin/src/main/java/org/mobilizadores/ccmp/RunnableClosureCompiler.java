@@ -21,36 +21,42 @@ import java.io.PrintStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Observable;
+import java.util.concurrent.locks.Lock;
+import java.util.logging.Logger;
 import org.apache.commons.lang3.reflect.MethodUtils;
 import com.google.javascript.jscomp.CommandLineRunner;
 
-class RunnableClosureCompiler extends Observable implements Runnable {
-
+public class RunnableClosureCompiler extends Observable implements Runnable {
+  
+  Logger logger = Logger.getLogger(RunnableClosureCompiler.class.getName());
   public static final Integer SUCCESS = 0;
 
-  private Object lock;
+  private Lock lock;
   private String[] args;
   private PrintStream stream;
 
-  public RunnableClosureCompiler(String[] args, Object lock, PrintStream stream) {
+  public RunnableClosureCompiler(String[] args, Lock lock, PrintStream stream) {
     super();
     this.lock = lock;
     this.args = args;
     this.stream = stream;
   }
 
+  /**
+   * 
+   */
   @Override
     public void run() {
       try {
         CommandLineRunner clr = null;
-        synchronized (this.lock) {
+        lock.lock();
           clr = getCommandLineRunnerNewInstance();
           setChanged();
           notifyObservers(new Notification("Compressing files", this.args));          
-        }
+        lock.unlock();
         MethodUtils.invokeMethod(clr, true, "run");
       } catch (NoSuchMethodException | IllegalAccessException e) {
-        e.printStackTrace();
+        logger.severe("Couldn't invoke method 'run' on CommandLineRunner instance: " + e.getMessage());
       } catch (InvocationTargetException e) {
         if(e.getCause().getClass().isAssignableFrom(SystemExitNotAllowedException.class)) {
           if(((SystemExitNotAllowedException) e.getCause()).getStatus() == SUCCESS){
@@ -58,12 +64,16 @@ class RunnableClosureCompiler extends Observable implements Runnable {
             notifyObservers(new Notification("Files compressed", this.args));
           }
         } else {
-          e.printStackTrace();
+          logger.severe("");
         }
       }
     }
 
 
+  /**
+   * Uses reflection to get the proper constructor and then gets a new instance of 
+   * {@link CommandLineRunner} with the arguments and input and output streams.
+   */
   public CommandLineRunner getCommandLineRunnerNewInstance() {
     CommandLineRunner clr = null;
     try {
@@ -73,7 +83,7 @@ class RunnableClosureCompiler extends Observable implements Runnable {
       clr = constructor.newInstance(this.args, this.stream, this.stream);
     } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
         | NoSuchMethodException | InvocationTargetException e) {
-      e.printStackTrace();
+      logger.severe("Couldn't instantiate CommandLineRunner: " + e.getMessage());
     } 
     return clr;
   }

@@ -20,11 +20,16 @@ package org.mobilizadores.ccmp;
 import java.io.OutputStream;
 import java.io.PrintStream;
 
-public class InternalStream extends PrintStream {
+/**
+ * Keeps the stream of characters in a variable called report, instead of printing right away,
+ * when the methods for printing are called. The "accumulated" stream is printed when the method
+ * <i>report</i> is called.
+ */
+public class DelayedInternalStream extends PrintStream {
     
     private StringBuilder report = new StringBuilder();
 
-    public InternalStream(OutputStream out) {
+    public DelayedInternalStream(OutputStream out) {
       super(out);
     }
 
@@ -48,6 +53,10 @@ public class InternalStream extends PrintStream {
       this.report.append(x);
     }
 
+    /**
+     * Uses the default system output stream for errors to print the characters appended
+     * to {@link DelayedInternalStream#report}
+     */
     public void report() {
       System.err.println(this.report.toString());
     }

@@ -142,17 +142,18 @@ public class CommandLineHelper {
     try {
       if(mojoParameters.contains(option.getName())) {
         Field mojoParameter = FieldUtils.getDeclaredField(mojo.getClass(), option.getName(), true);
-        if(mojoParameter.get(mojo) != null) {                  
+        if(FieldUtils.readField(mojoParameter, mojo, true) != null) {                  
           Consumer consumer = (value) -> {
               commandList.add(optionName);
               commandList.add(value.toString());
           };
-          MethodUtils.invokeMethod(mojoParameter.get(mojo), "forEach", consumer);
+          MethodUtils.invokeMethod(mojoParameter.get(mojo), true, "forEach", consumer);
         }
       }
-    } catch (SecurityException | IllegalArgumentException  | IllegalAccessException 
-        | NoSuchMethodException | InvocationTargetException e) {
-      e.printStackTrace();
+    } catch ( IllegalAccessException | NoSuchMethodException | IllegalArgumentException e) {
+      logger.severe("Couldn't create one or more of the iterable command line args: " + e.getCause());
+    } catch (InvocationTargetException e) {
+      logger.severe("Couldn't create one or more of the iterable command line args: " + e.getTargetException().getCause());
     }
     return commandList;
   }
@@ -178,7 +179,7 @@ public class CommandLineHelper {
           commandList.add(String.valueOf(FieldUtils.readField(mojoParameter, mojo)));
         }
       }
-    } catch ( IllegalAccessException e) {logger.severe("Couldn't create one or more of the command line args");}
+    } catch ( IllegalAccessException e) {logger.severe("Couldn't create one or more of the command line args: illegal access to field");}
     return commandList;
   }
 }
