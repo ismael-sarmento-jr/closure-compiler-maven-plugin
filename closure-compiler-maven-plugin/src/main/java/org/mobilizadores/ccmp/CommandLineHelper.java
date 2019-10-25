@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ClassUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -39,6 +40,8 @@ import org.kohsuke.args4j.Option;
  * The terms args and options are used as synonyms.
  */
 public class CommandLineHelper {
+  
+  Logger logger = Logger.getLogger(CommandLineHelper.class.getName());
   
   /**
    * @Option.name in {@link com.google.javascript.jscomp.CommandLineRunner$Flags#jsOutputFile}
@@ -67,13 +70,13 @@ public class CommandLineHelper {
   public CommandLineHelper(ClosureCompilerMojo mojo) {
     this.mojo = mojo;
     this.mojoParameters = Arrays.stream( mojo.getClass().getDeclaredFields())
-                              .filter(field -> field.isAnnotationPresent(Parameter.class))
-                              .map(field -> field.getName())
+                              .map(field -> field.getName()) //as Parameter annotation has retentionPolicy=Class, it's not being used as filter here
                               .collect(Collectors.toList());
     try {
       this.optionsClass = Class.forName("com.google.javascript.jscomp.CommandLineRunner$Flags");
     } catch (ClassNotFoundException e) { e.printStackTrace(); }
   }
+  
 
   /**
    * @return the final array of options for the command
@@ -165,16 +168,14 @@ public class CommandLineHelper {
     List<String> commandList = new ArrayList<String>();
     try {
       if(mojoParameters.contains(option.getName())) {
-        Field mojoParameter = mojo.getClass().getDeclaredField(option.getName());
-        if(mojoParameter.get(mojo) != null 
+        Field mojoParameter = FieldUtils.getDeclaredField(mojo.getClass(), option.getName(), true);
+        if( FieldUtils.readField(mojoParameter, mojo) != null 
             && (ClassUtils.isPrimitiveOrWrapper(mojoParameter.getType()) || mojoParameter.getType().isAssignableFrom(String.class))) {                  
           commandList.add(option.getDeclaredAnnotation(Option.class).name());
-          commandList.add(String.valueOf(mojoParameter.get(mojo)));
+          commandList.add(String.valueOf(FieldUtils.readField(mojoParameter, mojo)));
         }
       }
-    } catch (NoSuchFieldException | SecurityException | IllegalArgumentException  | IllegalAccessException e) {
-      e.printStackTrace();
-    }
+    } catch ( IllegalAccessException e) {logger.severe("Couldn't create one or more of the command line args");}
     return commandList;
   }
 }

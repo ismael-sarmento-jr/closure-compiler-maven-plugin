@@ -196,7 +196,7 @@ public class ClosureCompilerMojo extends AbstractMojo implements Observer {
   @Parameter
   Integer polymerVersion;
   @Parameter
-  String polymerExportPolicy = PolymerExportPolicy.LEGACY.name();
+  String polymerExportPolicy;
   @Parameter
   Boolean chromePass;
   @Parameter

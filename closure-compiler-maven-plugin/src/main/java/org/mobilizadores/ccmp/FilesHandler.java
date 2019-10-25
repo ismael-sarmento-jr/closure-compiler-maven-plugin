@@ -140,7 +140,7 @@ public class FilesHandler {
 
   private void includeAllJSFilesInInputDirectory(File inputDirectory) {
     if (inputDirectory != null) {
-      Files.fileTraverser().breadthFirst(inputDirectory).forEach(file -> {
+      Files.fileTreeTraverser().breadthFirstTraversal(inputDirectory).forEach(file -> {
         if (file.isFile() && "js".equals(Files.getFileExtension(file.getName()))
               && !file.getPath().contains("extern")) {
           this.effectiveInputFilesList.add(file);
