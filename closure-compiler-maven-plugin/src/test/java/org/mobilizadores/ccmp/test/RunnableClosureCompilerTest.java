@@ -1,41 +1,64 @@
 package org.mobilizadores.ccmp.test;
 
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Observable;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.BlockJUnit4ClassRunner;
+import org.mobilizadores.ccmp.Notification;
 import org.mobilizadores.ccmp.RunnableClosureCompiler;
+import org.mobilizadores.ccmp.SystemExitNotAllowedException;
+import static  org.mockito.Mockito.*;
+import org.mockito.Spy;
+import org.mockito.junit.MockitoJUnitRunner;
 import com.google.javascript.jscomp.CommandLineRunner;
 import junit.framework.Assert;
 
-@RunWith(BlockJUnit4ClassRunner.class)
+@RunWith(MockitoJUnitRunner.class)
 public class RunnableClosureCompilerTest {
 
   RunnableClosureCompiler rcc;
-  String[] js = {"file1.js","file2.js"};
-  String[] externs = {"extern1.js"};
-  String outputFile = "ouptput.js";
-  String[] args = {"--js","file1.js","--js","file2.js","--externs","extern1.js","--js_output_file","ouptput.js"};
+  RunnableClosureCompiler spiedRcc;
+  String[] js = {"src/test/resources/dir1/file11.js","src/test/resources/dir1/dir2/file21.js"};
+  String[] externs = {"src/test/resources/extern1.js"};
+  String outputFile = "src/test/resources/ouptput.js";
+  String[] args = {"--js","src/test/resources/dir1/file11.js","--js","src/test/resources/dir1/dir2/file21.js",
+      "--externs","src/test/resources/extern1.js","--js_output_file","src/test/resources/ouptput.js"};
+  boolean notified;
   
   @Before
   public void setUp() {
     this.rcc = new RunnableClosureCompiler(args , new ReentrantLock(), System.out);
+    this.spiedRcc = spy(rcc);
     Assert.assertNotNull(rcc);
   }
   
   @Test
   public void testConcurrentCompression() {
+    rcc.addObserver((Observable o, Object arg) -> {
+      Notification notif = (Notification) arg;
+      Assert.assertNotNull(notif);
+    });
     rcc.run();
   }
   
   @Test
-  public void testNotifyObservers() {
-    rcc.run();
+  public void testNotifyObserversOnSuccess() throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
+    doThrow(new InvocationTargetException(new SystemExitNotAllowedException(RunnableClosureCompiler.SUCCESS))
+            ).when(spiedRcc).runClosureCompiler(any());
+    spiedRcc.addObserver((Observable o, Object arg) -> {
+      notified = true;
+      Notification notif = (Notification) arg;
+      Assert.assertNotNull(notif);
+      Assert.assertEquals(this.args, notif.getArgs());
+    });
+    spiedRcc.run();
+    Assert.assertTrue(notified);
   }
   
   @Test

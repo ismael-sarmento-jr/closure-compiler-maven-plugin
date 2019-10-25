@@ -26,6 +26,10 @@ import java.util.logging.Logger;
 import org.apache.commons.lang3.reflect.MethodUtils;
 import com.google.javascript.jscomp.CommandLineRunner;
 
+/**
+ * Runs the compiler according to the arguments passed and notify the observers on the results
+ * of the run.
+ */
 public class RunnableClosureCompiler extends Observable implements Runnable {
   
   Logger logger = Logger.getLogger(RunnableClosureCompiler.class.getName());
@@ -43,7 +47,11 @@ public class RunnableClosureCompiler extends Observable implements Runnable {
   }
 
   /**
-   * 
+   * Invokes the method <i>run</i> in the command line runner instance (clr). 
+   * The list of'mixedJsSources' in {@link CommandLineRunner#Flags} is static, set during a new <i>clr</i>
+   * instantiation and read during configuration initiation, therefore the instantiation of <i>clr</i> 
+   * and subsequent access to the list are synchronized.
+   * The results of the tasks are reported to the observers, so they can be logged out.
    */
   @Override
     public void run() {
@@ -54,7 +62,7 @@ public class RunnableClosureCompiler extends Observable implements Runnable {
           setChanged();
           notifyObservers(new Notification("Compressing files", this.args));          
         lock.unlock();
-        MethodUtils.invokeMethod(clr, true, "run");
+        runClosureCompiler(clr);
       } catch (NoSuchMethodException | IllegalAccessException e) {
         logger.severe("Couldn't invoke method 'run' on CommandLineRunner instance: " + e.getMessage());
       } catch (InvocationTargetException e) {
@@ -64,10 +72,16 @@ public class RunnableClosureCompiler extends Observable implements Runnable {
             notifyObservers(new Notification("Files compressed", this.args));
           }
         } else {
-          logger.severe("");
+          logger.severe("Exception occured during compression:");
+          e.printStackTrace();
         }
       }
     }
+
+  public void runClosureCompiler(CommandLineRunner clr)
+      throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
+    MethodUtils.invokeMethod(clr, true, "run");
+  }
 
 
   /**
