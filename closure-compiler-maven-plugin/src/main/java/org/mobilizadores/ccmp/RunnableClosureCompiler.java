@@ -20,9 +20,9 @@ package org.mobilizadores.ccmp;
 import java.io.PrintStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.util.ConcurrentModificationException;
 import java.util.Observable;
 import java.util.concurrent.locks.Lock;
-import java.util.logging.Logger;
 import org.apache.commons.lang3.reflect.MethodUtils;
 import com.google.javascript.jscomp.CommandLineRunner;
 
@@ -32,8 +32,8 @@ import com.google.javascript.jscomp.CommandLineRunner;
  */
 public class RunnableClosureCompiler extends Observable implements Runnable {
   
-  Logger logger = Logger.getLogger(RunnableClosureCompiler.class.getName());
   public static final Integer SUCCESS = 0;
+  public static final Integer ERROR = 1;
 
   private Lock lock;
   private String[] args;
@@ -58,22 +58,26 @@ public class RunnableClosureCompiler extends Observable implements Runnable {
       try {
         CommandLineRunner clr = null;
         lock.lock();
-          clr = getCommandLineRunnerNewInstance();
+        clr = getCommandLineRunnerNewInstance();
+        if(clr != null) {            
           setChanged();
-          notifyObservers(new Notification("Compressing files", this.args));          
-        lock.unlock();
-        runClosureCompiler(clr);
+          notifyObservers(new Notification(SUCCESS, "Compressing files", this.args));          
+          lock.unlock();
+          runClosureCompiler(clr);
+        } 
       } catch (NoSuchMethodException | IllegalAccessException e) {
-        logger.severe("Couldn't invoke method 'run' on CommandLineRunner instance: " + e.getMessage());
+        setChanged();
+        notifyObservers(new Notification(ERROR, "Couldn't invoke method 'run' on CommandLineRunner instance: " + e.getMessage(), this.args));
       } catch (InvocationTargetException e) {
+        setChanged();
         if(e.getCause().getClass().isAssignableFrom(SystemExitNotAllowedException.class)) {
           if(((SystemExitNotAllowedException) e.getCause()).getStatus() == SUCCESS){
-            setChanged();
-            notifyObservers(new Notification("Files compressed", this.args));
+            notifyObservers(new Notification(SUCCESS, "Files compressed", this.args));
           }
+        } if (e.getCause().getClass().isAssignableFrom(ConcurrentModificationException.class)) {
+          notifyObservers(new Notification(ERROR, "Concurrent modification error trying to compress ", this.args));
         } else {
-          logger.severe("Exception occured during compression:");
-          e.printStackTrace();
+          notifyObservers(new Notification(ERROR, "Error trying to compress", this.args));
         }
       }
     }
@@ -87,8 +91,10 @@ public class RunnableClosureCompiler extends Observable implements Runnable {
   /**
    * Uses reflection to get the proper constructor and then gets a new instance of 
    * {@link CommandLineRunner} with the arguments and input and output streams.
+   * @throws InvocationTargetException if any other exception, not related with reflection calls,
+   *                                    is thrown during CommandLineRunner instantiation 
    */
-  public CommandLineRunner getCommandLineRunnerNewInstance() {
+  public CommandLineRunner getCommandLineRunnerNewInstance() throws InvocationTargetException {
     CommandLineRunner clr = null;
     try {
       Constructor<CommandLineRunner> constructor = CommandLineRunner.class
@@ -96,8 +102,8 @@ public class RunnableClosureCompiler extends Observable implements Runnable {
       constructor.setAccessible(true);
       clr = constructor.newInstance(this.args, this.stream, this.stream);
     } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
-        | NoSuchMethodException | InvocationTargetException e) {
-      logger.severe("Couldn't instantiate CommandLineRunner: " + e.getMessage());
+        | NoSuchMethodException e) {
+      notifyObservers(new Notification(ERROR, "Couldn't instantiate CommandLineRunner: " + e.getMessage(), this.args));
     } 
     return clr;
   }

@@ -19,6 +19,7 @@ package org.mobilizadores.ccmp;
  */
 public class Notification {
 
+  private Integer status;
   private String description;
   private String[] args;
 
@@ -26,7 +27,8 @@ public class Notification {
     super();
   }
 
-  public Notification(String description, String[] args) {
+  public Notification(Integer status, String description, String[] args) {
+    this.status = status;
     this.description = description;
     this.args = args;
   }
@@ -45,6 +47,14 @@ public class Notification {
 
   public void setArgs(String[] args) {
     this.args = args;
+  }
+
+  public Integer getStatus() {
+    return status;
+  }
+
+  public void setStatus(Integer status) {
+    this.status = status;
   }
 
 }

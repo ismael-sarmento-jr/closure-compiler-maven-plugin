@@ -65,9 +65,13 @@ public class FilesHandler {
   /**
    * Replaces the file separators in the path by the system separators. 
    */
-  public String normalizePath(String path) {
+  public static String normalizePath(String path) {
     String match =  SYS_SEPARATOR.equals("/") ? "\\\\" : "\\/";
     return path.replaceAll(match, ESCAPE + SYS_SEPARATOR);
+  }
+  
+  public static List<String> getNormalizedPaths(String[] jsSources) {
+    return Arrays.asList(jsSources).stream().map(js -> {return new File(js).getPath();}).collect(Collectors.toList());
   }
   
   /**

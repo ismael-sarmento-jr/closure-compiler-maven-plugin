@@ -363,7 +363,11 @@ public class ClosureCompilerMojo extends AbstractMojo implements Observer {
     if(obj != null) {   
       Notification notif = (Notification) obj;
       int pos = IntStream.range(0, notif.getArgs().length).filter(i -> "--js_output_file".equals(notif.getArgs()[i])).findFirst().getAsInt();
-      getLog().info(notif.getDescription() + " to: " + notif.getArgs()[pos + 1]);
+      if(notif.getStatus().equals(RunnableClosureCompiler.SUCCESS)) {        
+        getLog().info(notif.getDescription() + " to: " + notif.getArgs()[pos + 1]);
+      } else {
+        getLog().error(notif.getDescription() + notif.getArgs()[pos + 1]);
+      }
     }
   }
   

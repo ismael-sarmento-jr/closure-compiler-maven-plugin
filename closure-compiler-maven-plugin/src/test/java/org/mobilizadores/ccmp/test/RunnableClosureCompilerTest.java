@@ -1,27 +1,35 @@
 package org.mobilizadores.ccmp.test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.spy;
+import java.io.File;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Observable;
+import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.junit.runners.BlockJUnit4ClassRunner;
+import org.mobilizadores.ccmp.ContextHoldingSecurityManager;
+import org.mobilizadores.ccmp.FilesHandler;
 import org.mobilizadores.ccmp.Notification;
 import org.mobilizadores.ccmp.RunnableClosureCompiler;
 import org.mobilizadores.ccmp.SystemExitNotAllowedException;
-import static  org.mockito.Mockito.*;
-import org.mockito.Spy;
-import org.mockito.junit.MockitoJUnitRunner;
 import com.google.javascript.jscomp.CommandLineRunner;
 import junit.framework.Assert;
 
-@RunWith(MockitoJUnitRunner.class)
+@RunWith(BlockJUnit4ClassRunner.class)
 public class RunnableClosureCompilerTest {
 
+  Lock lock = new ReentrantLock();
   RunnableClosureCompiler rcc;
   RunnableClosureCompiler spiedRcc;
   String[] js = {"src/test/resources/dir1/file11.js","src/test/resources/dir1/dir2/file21.js"};
@@ -30,21 +38,33 @@ public class RunnableClosureCompilerTest {
   String[] args = {"--js","src/test/resources/dir1/file11.js","--js","src/test/resources/dir1/dir2/file21.js",
       "--externs","src/test/resources/extern1.js","--js_output_file","src/test/resources/ouptput.js"};
   boolean notified;
+  private ContextHoldingSecurityManager securityManager = new ContextHoldingSecurityManager();
   
   @Before
   public void setUp() {
-    this.rcc = new RunnableClosureCompiler(args , new ReentrantLock(), System.out);
+    System.setSecurityManager(securityManager );
+    this.rcc = new RunnableClosureCompiler(args , lock, System.out);
     this.spiedRcc = spy(rcc);
     Assert.assertNotNull(rcc);
   }
   
   @Test
   public void testConcurrentCompression() {
-    rcc.addObserver((Observable o, Object arg) -> {
-      Notification notif = (Notification) arg;
-      Assert.assertNotNull(notif);
-    });
-    rcc.run();
+    try {      
+      for (int i = 0; i < 100; i++) {        
+        RunnableClosureCompiler rcc = new RunnableClosureCompiler(args , lock, System.out);
+        rcc.addObserver((Observable o, Object arg) -> {
+          Notification notif = (Notification) arg;
+          Assert.assertNotNull(notif);
+          Assert.assertEquals(RunnableClosureCompiler.SUCCESS, notif.getStatus());
+        });
+        Thread thread = new Thread(rcc);
+        thread.start();
+      }
+      securityManager.enableSystemExit();
+    } catch (Exception e) {
+      Assert.fail(e.getMessage());
+    }
   }
   
   @Test
@@ -64,19 +84,26 @@ public class RunnableClosureCompilerTest {
   @Test
   @SuppressWarnings("unchecked")
   public void testGetNewCompilerInstanceWithConsistentConfiguration() {
-    CommandLineRunner clr = rcc.getCommandLineRunnerNewInstance();
-    Assert.assertNotNull(clr);
-    Object config = getConfig(clr);
-    
-    List<Object> flagsEntries = (List<Object>) getConfigParam(config, "mixedJsSources");
-    List<String> jsSources = getJsSources(flagsEntries);
-    Assert.assertTrue(jsSources.containsAll(Arrays.asList(this.js)));
-    
-    String outputFile = (String) getConfigParam(config, "jsOutputFile");
-    Assert.assertEquals(this.outputFile, outputFile);
-    
-    List<String> externs = (List<String>) getConfigParam(config, "externs");
-    Assert.assertTrue(externs.containsAll(Arrays.asList(this.externs)));
+    CommandLineRunner clr;
+    try {
+      clr = rcc.getCommandLineRunnerNewInstance();
+
+      Assert.assertNotNull(clr);
+      Object config = getConfig(clr);
+      
+      List<Object> flagsEntries = (List<Object>) getConfigParam(config, "mixedJsSources");
+      List<String> jsSources = getJsSources(flagsEntries);
+      
+      Assert.assertTrue( jsSources.containsAll(FilesHandler.getNormalizedPaths(this.js)));
+      
+      String outputFile = (String) getConfigParam(config, "jsOutputFile");
+      Assert.assertEquals(this.outputFile, outputFile);
+      
+      List<String> externs = (List<String>) getConfigParam(config, "externs");
+      Assert.assertTrue(externs.containsAll(Arrays.asList(this.externs)));
+    } catch (InvocationTargetException e) {
+      Assert.fail(e.getCause().toString());
+    }
   }
   
   public Object getConfigParam(Object config, String paramName) {
