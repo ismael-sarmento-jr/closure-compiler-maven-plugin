@@ -51,6 +51,8 @@ public class CommandLineHelper {
    * @Option.name in {@link com.google.javascript.jscomp.CommandLineRunner$Flags#js}
    */
   private static final String JS_OPTION = "--js";
+  
+  private static final String EXTERNS_OPTION = "--externs";
 
   /**
    * Instance of the maven mojo with its parameters set
@@ -81,10 +83,10 @@ public class CommandLineHelper {
   /**
    * @return the final array of options for the command
    */
-  public String[] getCommandLine(String outputFile, File inputDirectory, String... inputFiles) {
+  public String[] getCommandLine(String outputFile, File inputDirectory, String[] inputFiles, String[] externs) {
     List<String> commandList = new ArrayList<>();
     commandList.addAll(getArgs());
-    commandList.addAll(getFilesArgs(outputFile, inputFiles));
+    commandList.addAll(getFilesArgs(outputFile, inputFiles, externs));
     return commandList.toArray(new String[] {});
   }
 
@@ -93,12 +95,16 @@ public class CommandLineHelper {
    * @param inputFiles
    * @return
    */
-  public List<String> getFilesArgs(String outputFile, String... inputFiles) {
+  public List<String> getFilesArgs(String outputFile, String[] inputFiles, String[] externs) {
     List<String> commandList = new ArrayList<>();
     commandList.add(JS_OUTPUT_FILE_OPTION);
     commandList.add(outputFile);
     Arrays.asList(inputFiles).forEach(file -> {
       commandList.add(JS_OPTION);
+      commandList.add(file);
+    });
+    Arrays.asList(externs).forEach(file -> {
+      commandList.add(EXTERNS_OPTION);
       commandList.add(file);
     });
     return commandList;

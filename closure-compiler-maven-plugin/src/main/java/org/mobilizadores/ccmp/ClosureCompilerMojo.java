@@ -86,9 +86,9 @@ public class ClosureCompilerMojo extends AbstractMojo implements Observer {
    * better performance.
    */
   @Parameter(defaultValue = "10")
-  Integer maxNumberOfThreads;
+  Integer maxNumberOfThreads = 10;
   @Parameter(defaultValue = "true")
-  Boolean failOnNoInputFilesFound;
+  Boolean failOnNoInputFilesFound = true;
   
   
   /*
@@ -115,7 +115,7 @@ public class ClosureCompilerMojo extends AbstractMojo implements Observer {
   @Parameter(defaultValue = "WARNING")
   String loggingLevel = "WARNING";
   @Parameter
-  List<String> externs;
+  List<File> externs;
   @Parameter
   List<String> unusedJsZip;
   @Parameter
@@ -251,7 +251,7 @@ public class ClosureCompilerMojo extends AbstractMojo implements Observer {
   @Parameter
   Boolean printSourceAfterEachPass;
   @Parameter(defaultValue = "BROWSER")
-  String moduleResolutionMode;
+  String moduleResolutionMode = "BROWSER";
   @Parameter
   Map<String, String> browserResolverPrefixReplacements;
   @Parameter
@@ -283,10 +283,8 @@ public class ClosureCompilerMojo extends AbstractMojo implements Observer {
    * all the tasks are finished. 
    */
   public void execute() throws MojoExecutionException {
-    if (this.inputDirectory == null && this.includeFiles == null)
-      throw new MojoExecutionException(
-          "Either parameter 'includeFiles' or 'inputDirectory' must be specified");
     
+    checkRequiredInputFilesProperties();
     this.executorPoolService = Executors.newFixedThreadPool(this.maxNumberOfThreads);
     List<File> effectiveInputFilesList = this.filesHandler.getEffectiveInputFilesList(
                                                                                       this.inputDirectory, 
@@ -325,12 +323,22 @@ public class ClosureCompilerMojo extends AbstractMojo implements Observer {
   }
 
   /**
+   * At least one of the parameters 'inputDirectory' or 'includeFiles' is required to be specified;
+   */
+  private void checkRequiredInputFilesProperties() throws MojoExecutionException{
+    if (this.inputDirectory == null && this.includeFiles == null)
+      throw new MojoExecutionException(
+          "Either parameter 'includeFiles' or 'inputDirectory' must be specified");
+  }
+
+  /**
    * Uses the input and output files passed as parameters to get the formatted command line args
    * and request a new instance of a observable runnable. Adds this mojo to the list of observers
    * and then adds the runnable to the execution queue.
    */
   private void queueCompilation(String outputFilePath, String[] inputArray) {
-    String[] commandLine = this.clh.getCommandLine(outputFilePath, this.inputDirectory, inputArray);
+    String[] externsStr = this.externs.stream().map(extern -> extern.getAbsolutePath()).collect(Collectors.toList()).toArray(new String[] {});
+    String[] commandLine = this.clh.getCommandLine(outputFilePath, this.inputDirectory, inputArray, externsStr);
     RunnableClosureCompiler runnableCc = getNewRunnableClosureCompiler(commandLine );
     runnableCc.addObserver(this);
     executorPoolService.execute(runnableCc);

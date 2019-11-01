@@ -73,11 +73,13 @@ public class RunnableClosureCompiler extends Observable implements Runnable {
         if(e.getCause().getClass().isAssignableFrom(SystemExitNotAllowedException.class)) {
           if(((SystemExitNotAllowedException) e.getCause()).getStatus() == SUCCESS){
             notifyObservers(new Notification(SUCCESS, "Files compressed", this.args));
+          } else {
+            notifyObservers(new Notification(ERROR, "Error reported by the compressor trying to compress ", this.args));
           }
-        } if (e.getCause().getClass().isAssignableFrom(ConcurrentModificationException.class)) {
+        } else if (e.getCause().getClass().isAssignableFrom(ConcurrentModificationException.class)) {
           notifyObservers(new Notification(ERROR, "Concurrent modification error trying to compress ", this.args));
         } else {
-          notifyObservers(new Notification(ERROR, "Error trying to compress", this.args));
+          notifyObservers(new Notification(ERROR, "Error in the plugin, trying to compress ", this.args));
         }
       }
     }

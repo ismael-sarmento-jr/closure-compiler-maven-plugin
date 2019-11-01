@@ -56,7 +56,8 @@ public class CommandLineHelperTest extends AbstractMojoTestCase {
   public void testFilesArgsConsistentPairs() {
     String outputFile = "src/test/resource/test-results/output.js";
     String[] inputFiles = {"src/test/resource/dir1/file11", "src/test/resource/dir1/dir2/file21"};
-    List<String> filesArgs = clh.getFilesArgs(outputFile, inputFiles);
+    String[] externs = {"src/test/resources/extern1.js"};
+    List<String> filesArgs = clh.getFilesArgs(outputFile, inputFiles, externs );
     assertAlternateArgs(filesArgs);
     
   }

@@ -71,7 +71,7 @@ public class FilesHandler {
   }
   
   public static List<String> getNormalizedPaths(String[] jsSources) {
-    return Arrays.asList(jsSources).stream().map(js -> {return new File(js).getPath();}).collect(Collectors.toList());
+    return Arrays.asList(jsSources).stream().map(js -> new File(js).getPath()).collect(Collectors.toList());
   }
   
   /**
