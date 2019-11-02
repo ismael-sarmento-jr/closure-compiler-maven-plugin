@@ -1,12 +1,13 @@
 package org.mobilizadores.ccmp.test;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Observable;
 import org.apache.commons.io.FileUtils;
 import org.apache.maven.plugin.testing.AbstractMojoTestCase;
-import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -22,7 +23,7 @@ public class ClosureCompilerMojoIntegrationTest extends AbstractMojoTestCase {
   
   ClosureCompilerMojo ccm;
   ContextHoldingSecurityManager securityManager = new ContextHoldingSecurityManager();
-  File outputFolder = new File("src/test/resources/output/compressed");
+  File outputFolder = new File("src/test/resources/output");
   List<Notification> results = new ArrayList<>();
   
   @Before
@@ -34,21 +35,21 @@ public class ClosureCompilerMojoIntegrationTest extends AbstractMojoTestCase {
   
   @Test
   public void testCompressionSingleOutputFile() throws Exception {
-    this.ccm = setUpClosureCompilerMojo("src/test/resources/poms/single.output.pom.xml");
+    this.ccm = setUpClosureCompilerMojo("src/test/resources/its/single.output.pom.xml");
     executeCompression();
     assertResultSuccessAndCompressedFiles();
   }
   
   @Test
   public void testCompressionMultipleOutputFilesWithSuffix() throws Exception {
-    this.ccm = setUpClosureCompilerMojo("src/test/resources/poms/single.output.pom.xml");
+    this.ccm = setUpClosureCompilerMojo("src/test/resources/its/mult.output.no.suffix.pom.xml");
     executeCompression();
     assertResultSuccessAndCompressedFiles();
   }
   
   @Test
   public void testCompressionMultipleOutputFilesNoSuffix() throws Exception {
-    this.ccm = setUpClosureCompilerMojo("src/test/resources/poms/single.output.pom.xml");
+    this.ccm = setUpClosureCompilerMojo("src/test/resources/its/mult.output.suffix.pom.xml");
     executeCompression();
     assertResultSuccessAndCompressedFiles();
   }
@@ -78,4 +79,5 @@ public class ClosureCompilerMojoIntegrationTest extends AbstractMojoTestCase {
     });
   }
   
+   
 }

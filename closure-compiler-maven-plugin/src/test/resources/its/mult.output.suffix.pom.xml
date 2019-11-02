@@ -37,14 +37,12 @@
     		<artifactId>closure-compiler-maven-plugin</artifactId>
     		<version>0.0.1</version>
     		<configuration>
+    			<suffix>min</suffix>
     			<inputDirectory>src/test/resources</inputDirectory>
     			<outputDirectory>src/test/resources/output</outputDirectory>
-    			<outputFile>src/test/resources/output/compressed/output.js</outputFile>
     			<moduleRoot>
-    				<root>src/test/resources</root>
+    				<root>src/test/resources/dir1</root>
     			</moduleRoot>
-    			<!-- <compilationLevel>ADVANCED</compilationLevel> -->
-    			<!-- <warningLevel>DEFAULT</warningLevel> -->
     			<externFiles>
     				<extern>src/test/resources/dir1/extern1.js</extern>
     			</externFiles>

@@ -299,19 +299,18 @@ public class ClosureCompilerMojo extends AbstractMojo implements Observer {
                                                                                       this.failOnNoInputFilesFound
                                                                                        );
     
+    String tempFolder = this.suffix == null //if the names of the files are preserved (suffix is null), a temporary folder needs to be used so the files are not overwritten
+                        && this.outputFile == null ? 
+                        File.separator + "temp" : ""; 
     if (this.outputFile == null) {
-          String tempFolder = this.suffix != null ? "" : File.separator + "temp"; //if the names of the files are preserved, a temporary folder needs to be used so the files are not overwritten
           effectiveInputFilesList.stream().forEach(file -> {
             try {
               Set<String> fileWithDeps = this.filesHandler.getFileWithDepsList(file);
               if(fileWithDeps.size() > 0) {
                 String outputFilePath = this.outputDirectory.getAbsolutePath() 
-                                            + tempFolder
+                                            + tempFolder //WHY has to be FINAL?
                                             + this.filesHandler.getResultFileRelativePath(this.inputDirectory, file, this.suffix);
                 queueCompilation(outputFilePath, fileWithDeps.toArray(new String[]{}));
-              }
-              if(!tempFolder.isEmpty()) {
-                this.filesHandler.copyFilesFromTempFolder(this.outputDirectory.getAbsolutePath() + tempFolder, this.outputDirectory.getAbsolutePath());
               }
             }  catch (IOException e) {
               throw new RuntimeException(e.getMessage());
@@ -328,8 +327,19 @@ public class ClosureCompilerMojo extends AbstractMojo implements Observer {
     }
     
     awaitTasksTermination(executorPoolService);
+    copyTempOutputFiles(tempFolder);
     this.stream.report();
     this.securityManager.enableSystemExit();
+  }
+
+  private void copyTempOutputFiles(String tempFolder) {
+    try {
+      if (tempFolder != null && !tempFolder.isEmpty()) {
+        this.filesHandler.copyFilesFromTempFolder( this.outputDirectory.getAbsolutePath() + tempFolder, this.outputDirectory.getAbsolutePath());
+      }
+    } catch (IOException e) {
+      throw new RuntimeException(e.getMessage());
+    }
   }
 
   /**
