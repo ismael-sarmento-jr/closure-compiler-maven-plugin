@@ -1,10 +1,16 @@
 # Maven
 target
+src/test/resources/output/*
 
 # Eclipse
 .settings
 .classpath
 .project
+.metadata
+
+#VsCode
+.vscode
+.editorconfig
 
 # Compiled class file
 *.class
