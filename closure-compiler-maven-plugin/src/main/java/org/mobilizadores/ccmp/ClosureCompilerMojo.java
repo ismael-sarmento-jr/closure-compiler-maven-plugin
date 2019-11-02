@@ -21,6 +21,8 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Observable;
@@ -56,6 +58,10 @@ public class ClosureCompilerMojo extends AbstractMojo implements Observer {
   ContextHoldingSecurityManager securityManager = new ContextHoldingSecurityManager();
   ExecutorService executorPoolService;
   DelayedInternalStream stream;
+  /**
+   * Allows other objects to check the result of the compression. It is initially meant for testing
+   */
+  Set<Observer> externalObservers = new HashSet<>();
  
   /*
    * *************************
@@ -67,6 +73,8 @@ public class ClosureCompilerMojo extends AbstractMojo implements Observer {
   File inputDirectory;
   @Parameter(alias = "js")
   List<File> includeFiles;
+  @Parameter(alias = "externs")
+  List<File> externFiles;
   @Parameter(defaultValue = "target/${project.build.finalName}/WEB-INF/js")
   File outputDirectory;
   /**
@@ -114,8 +122,6 @@ public class ClosureCompilerMojo extends AbstractMojo implements Observer {
   String jscompDevMode = "OFF";
   @Parameter(defaultValue = "WARNING")
   String loggingLevel = "WARNING";
-  @Parameter
-  List<File> externs;
   @Parameter
   List<String> unusedJsZip;
   @Parameter
@@ -265,6 +271,7 @@ public class ClosureCompilerMojo extends AbstractMojo implements Observer {
   @Parameter
   List<String> moduleRoot;
   
+  
   public ClosureCompilerMojo() {
     super();
     System.setSecurityManager(this.securityManager);
@@ -290,10 +297,10 @@ public class ClosureCompilerMojo extends AbstractMojo implements Observer {
                                                                                       this.inputDirectory, 
                                                                                       this.includeFiles, 
                                                                                       this.failOnNoInputFilesFound
-                                                                                      );
+                                                                                       );
     
-    String tempFolder = this.suffix != null ? "" : File.separator + "temp";
     if (this.outputFile == null) {
+          String tempFolder = this.suffix != null ? "" : File.separator + "temp"; //if the names of the files are preserved, a temporary folder needs to be used so the files are not overwritten
           effectiveInputFilesList.stream().forEach(file -> {
             try {
               Set<String> fileWithDeps = this.filesHandler.getFileWithDepsList(file);
@@ -303,22 +310,25 @@ public class ClosureCompilerMojo extends AbstractMojo implements Observer {
                                             + this.filesHandler.getResultFileRelativePath(this.inputDirectory, file, this.suffix);
                 queueCompilation(outputFilePath, fileWithDeps.toArray(new String[]{}));
               }
+              if(!tempFolder.isEmpty()) {
+                this.filesHandler.copyFilesFromTempFolder(this.outputDirectory.getAbsolutePath() + tempFolder, this.outputDirectory.getAbsolutePath());
+              }
             }  catch (IOException e) {
-              e.printStackTrace();
+              throw new RuntimeException(e.getMessage());
             }
           });
+          
     } else {
         String[] inputArray = effectiveInputFilesList.stream().map(file -> {
                                                 return file.getPath();
                                               }).collect(Collectors.toList()).toArray(new String[] {});
         if(inputArray.length > 0) {
-          queueCompilation(this.outputFile.getPath(), inputArray);
+          queueCompilation(this.outputFile.getAbsolutePath(), inputArray);
         }
     }
     
     awaitTasksTermination(executorPoolService);
     this.stream.report();
-    this.filesHandler.copyFilesFromTempFolder(this.outputDirectory.getAbsolutePath() + tempFolder, this.outputDirectory.getAbsolutePath());
     this.securityManager.enableSystemExit();
   }
 
@@ -333,14 +343,15 @@ public class ClosureCompilerMojo extends AbstractMojo implements Observer {
 
   /**
    * Uses the input and output files passed as parameters to get the formatted command line args
-   * and request a new instance of a observable runnable. Adds this mojo to the list of observers
-   * and then adds the runnable to the execution queue.
+   * and request a new instance of a observable runnable. Adds this mojo to the list of observers,
+   * as well as any external observer and then adds the runnable to the execution queue.
    */
   private void queueCompilation(String outputFilePath, String[] inputArray) {
-    String[] externsStr = this.externs.stream().map(extern -> extern.getAbsolutePath()).collect(Collectors.toList()).toArray(new String[] {});
+    String[] externsStr = this.externFiles.stream().map(extern -> extern.getAbsolutePath()).collect(Collectors.toList()).toArray(new String[] {});
     String[] commandLine = this.clh.getCommandLine(outputFilePath, this.inputDirectory, inputArray, externsStr);
     RunnableClosureCompiler runnableCc = getNewRunnableClosureCompiler(commandLine );
     runnableCc.addObserver(this);
+    this.externalObservers.stream().forEach(observer -> runnableCc.addObserver(observer));
     executorPoolService.execute(runnableCc);
   }
 
@@ -379,5 +390,11 @@ public class ClosureCompilerMojo extends AbstractMojo implements Observer {
     }
   }
   
+  /**
+   * Adds observers to the list of external observers
+   */
+  public void addExternalObserver(Observer... observers ) {
+    this.externalObservers.addAll(Arrays.asList(observers));
+  }
 }
 

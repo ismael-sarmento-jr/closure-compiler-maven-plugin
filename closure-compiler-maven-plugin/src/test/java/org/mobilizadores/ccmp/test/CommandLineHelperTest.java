@@ -43,9 +43,9 @@ public class CommandLineHelperTest extends AbstractMojoTestCase {
   
   @Test
   public void testGetIterableArgs() throws IllegalAccessException {
-    List<String> externs = Arrays.asList(new String[]{"extern1", "extern2", "extern3"});
-    FieldUtils.writeDeclaredField(ccm, "externs", externs, true);
-    List<String> args = clh.getIterableArgsPairs("externs");
+    List<String> externs = Arrays.asList(new String[]{"root1", "root2", "root3"});
+    FieldUtils.writeDeclaredField(ccm, "moduleRoot", externs, true);
+    List<String> args = clh.getIterableArgsPairs("moduleRoot");
     Assert.assertFalse(args.isEmpty());
     Assert.assertEquals(6, args.size());
     Assert.assertTrue(args.containsAll(externs));
@@ -56,7 +56,7 @@ public class CommandLineHelperTest extends AbstractMojoTestCase {
   public void testFilesArgsConsistentPairs() {
     String outputFile = "src/test/resource/test-results/output.js";
     String[] inputFiles = {"src/test/resource/dir1/file11", "src/test/resource/dir1/dir2/file21"};
-    String[] externs = {"src/test/resources/extern1.js"};
+    String[] externs = {"src/test/resources/dir1/extern1.js"};
     List<String> filesArgs = clh.getFilesArgs(outputFile, inputFiles, externs );
     assertAlternateArgs(filesArgs);
     

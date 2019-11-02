@@ -30,10 +30,10 @@ public class RunnableClosureCompilerTest {
   RunnableClosureCompiler rcc;
   RunnableClosureCompiler spiedRcc;
   String[] js = {"src/test/resources/dir1/file11.js","src/test/resources/dir1/dir2/file21.js"};
-  String[] externs = {"src/test/resources/extern1.js"};
+  String[] externs = {"src/test/resources/dir1/extern1.js"};
   String outputFile = "src/test/resources/ouptput.js";
   String[] args = {"--js","src/test/resources/dir1/file11.js","--js","src/test/resources/dir1/dir2/file21.js",
-      "--externs","src/test/resources/extern1.js","--js_output_file","src/test/resources/ouptput.js"};
+      "--externs","src/test/resources/dir1/extern1.js","--js_output_file","src/test/resources/ouptput.js"};
   boolean notified;
   private ContextHoldingSecurityManager securityManager = new ContextHoldingSecurityManager();
   

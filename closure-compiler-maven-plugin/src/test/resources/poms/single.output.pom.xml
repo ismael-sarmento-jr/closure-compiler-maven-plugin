@@ -39,15 +39,15 @@
     		<configuration>
     			<inputDirectory>src/test/resources</inputDirectory>
     			<outputDirectory>src/test/resources/output</outputDirectory>
-    			<outputFile>output.js</outputFile>
+    			<outputFile>src/test/resources/output/compressed/output.js</outputFile>
     			<moduleRoot>
     				<root>src/test/resources</root>
     			</moduleRoot>
     			<!-- <compilationLevel>ADVANCED</compilationLevel> -->
     			<!-- <warningLevel>DEFAULT</warningLevel> -->
-    			<externs>
-    				<extern>src/test/resources/externs/extern1.js</extern>
-    			</externs>
+    			<externFiles>
+    				<extern>src/test/resources/dir1/extern1.js</extern>
+    			</externFiles>
     		</configuration>
     		<executions>
     			<execution>

@@ -54,7 +54,7 @@ public class DelayedInternalStream extends PrintStream {
     }
 
     /**
-     * Uses the default system output stream for errors to print the characters appended
+     * Uses the default system <b>error</b> output stream for errors to print the characters appended
      * to {@link DelayedInternalStream#report}
      */
     public void report() {

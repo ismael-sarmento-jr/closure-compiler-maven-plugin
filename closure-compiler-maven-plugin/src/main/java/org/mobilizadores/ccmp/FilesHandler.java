@@ -106,15 +106,14 @@ public class FilesHandler {
    * the hierarchy of subfolders, then deletes the temporary folder with its contents.
    * @param source
    * @param dest
+   * @throws IOException 
    */
-  public void copyFilesFromTempFolder(String source, String dest) {
-    try {
+  public void copyFilesFromTempFolder(String source, String dest) throws IOException {
       if(source != null && !source.isEmpty()) {
         File temp = new File(source);
         FileUtils.copyDirectoryStructure(temp, new File(dest));
         FileUtils.deleteDirectory(temp);
       }
-    } catch (IOException e) {e.printStackTrace();}
   }
   
   /**
